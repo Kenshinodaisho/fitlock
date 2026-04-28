@@ -1,822 +1,682 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
 <title>FitLock — Sweat to Scroll</title>
-<meta name="description" content="Turn screen time addiction into fitness gains. Do pushups to unlock your apps." />
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E💪%3C/text%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E💪%3C/text%3E%3C/svg%3E"/>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.20.0/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
 <style>
-  * { -webkit-tap-highlight-color: transparent; }
-  body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: #0f172a;
-    overscroll-behavior: none;
-  }
-  #root {
-    max-width: 430px;
-    margin: 0 auto;
-    min-height: 100vh;
-    background: #f8fafc;
-    box-shadow: 0 0 60px rgba(0,0,0,0.3);
-    position: relative;
-    overflow: hidden;
-  }
-  @media (max-width: 430px) {
-    #root { box-shadow: none; }
-  }
-  .animate-in { animation: fadeIn 0.3s ease-out; }
-  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-  .slide-up { animation: slideUp 0.3s ease-out; }
-  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-  .pulse-ring {
-    animation: pulseRing 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
-  }
-  @keyframes pulseRing {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.7); }
-    70% { transform: scale(1); box-shadow: 0 0 0 20px rgba(249, 115, 22, 0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(249, 115, 22, 0); }
-  }
+*{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0f172a;overscroll-behavior:none}
+#root{max-width:430px;margin:0 auto;min-height:100vh;background:#f8fafc;position:relative;overflow:hidden;box-shadow:0 0 60px rgba(0,0,0,.4)}
+@media(max-width:430px){#root{box-shadow:none}}
+
+/* Dark mode overrides */
+body.dark-mode #root{background:#0f172a;}
+body.dark-mode .dm-bg{background:#1e293b!important;}
+body.dark-mode .dm-bg-deep{background:#0f172a!important;}
+body.dark-mode .dm-bg-card{background:#1e293b!important;}
+body.dark-mode .dm-text{color:#f1f5f9!important;}
+body.dark-mode .dm-text-muted{color:#94a3b8!important;}
+body.dark-mode .dm-border{border-color:#334155!important;}
+body.dark-mode .dm-surface{background:#334155!important;}
+body.dark-mode .dm-input{background:#334155!important;border-color:#475569!important;color:#f1f5f9!important;}
+body.dark-mode .dm-input::placeholder{color:#64748b!important;}
+body.dark-mode .dm-tab-bar{background:#1e293b!important;border-color:#334155!important;}
+body.dark-mode .dm-tab-inactive{color:#64748b!important;}
+body.dark-mode .dm-section-label{color:#94a3b8!important;}
+body.dark-mode .dm-chevron{color:#475569!important;}
+body.dark-mode .dm-badge-bg{background:#334155!important;}
+body.dark-mode .dm-settings-bg{background:#0f172a!important;}
+body.dark-mode .dm-settings-header{background:#1e293b!important;border-color:#334155!important;}
 </style>
 </head>
 <body>
 <div id="root"></div>
-
 <script type="text/babel" data-presets="react">
-const { useState, useEffect, useRef } = React;
+const {useState,useEffect,useRef}=React;
 
-// Icon components using inline SVG
-const Icon = ({ name, className = "w-5 h-5", fill = "none", strokeWidth = 2 }) => {
-  const icons = {
-    Dumbbell: <path d="M14.4 14.4 9.6 9.6M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829zM21.5 21.5l-1.4-1.4M3.9 3.9 2.5 2.5M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z" />,
-    Lock: <><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
-    Unlock: <><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></>,
-    Flame: <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>,
-    Trophy: <><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></>,
-    Users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>,
-    TrendingUp: <><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></>,
-    Heart: <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>,
-    Zap: <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>,
-    Play: <polygon points="6 3 20 12 6 21 6 3"/>,
-    Pause: <><rect width="4" height="16" x="6" y="4"/><rect width="4" height="16" x="14" y="4"/></>,
-    X: <><path d="M18 6 6 18"/><path d="m6 6 12 12"/></>,
-    Check: <polyline points="20 6 9 17 4 12"/>,
-    ChevronRight: <polyline points="9 18 15 12 9 6"/>,
-    ChevronLeft: <polyline points="15 18 9 12 15 6"/>,
-    ArrowLeft: <><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></>,
-    Home: <><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>,
-    BarChart3: <><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></>,
-    User: <><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
-    Settings: <><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></>,
-    Bell: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></>,
-    Shield: <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>,
-    Sparkles: <><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></>,
-    Clock: <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
-    Plus: <><path d="M5 12h14"/><path d="M12 5v14"/></>,
-    Wind: <><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></>,
-    Brain: <><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M19.938 10.5a4 4 0 0 1 .585.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M19.967 17.484A4 4 0 0 1 18 18"/></>,
-    Camera: <><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></>,
-    CameraOff: <><line x1="2" x2="22" y1="2" y2="22"/><path d="M7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16"/><path d="M9.5 4h5L17 7h3a2 2 0 0 1 2 2v7.5"/><path d="M14.121 15.121A3 3 0 1 1 9.88 10.88"/></>,
-    TreePine: <><path d="m17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17z"/><path d="M12 22v-3"/></>,
-    AlertCircle: <><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></>,
-    Target: <><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></>,
-  };
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={fill} stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>
-      {icons[name]}
-    </svg>
-  );
+/* ── SVG Exercise Icons ── */
+const SvgIcon=({children,s=24})=><svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{children}</svg>;
+const Ico=({n,s=24})=>{
+  if(n==="Pushups")return<SvgIcon s={s}><circle cx="12" cy="5" r="2"/><path d="M8 12h8"/><path d="M8 12V9a4 4 0 0 1 8 0v3"/><path d="M6 12v5"/><path d="M18 12v5"/><path d="M6 17h12"/></SvgIcon>;
+  if(n==="Squats")return<SvgIcon s={s}><circle cx="12" cy="4" r="2"/><path d="M12 6v4"/><path d="M8 10l4 2 4-2"/><path d="M8 10l-2 6"/><path d="M16 10l2 6"/></SvgIcon>;
+  if(n==="Jumping Jacks")return<SvgIcon s={s}><circle cx="12" cy="4" r="2"/><path d="M12 6v5"/><path d="M5 8l7 3 7-3"/><path d="M10 17l2 3 2-3"/><path d="M12 11v6"/></SvgIcon>;
+  if(n==="Plank")return<SvgIcon s={s}><circle cx="18" cy="7" r="2"/><path d="M4 14h14a2 2 0 0 0 0-4H8L4 14z"/><path d="M4 14v3"/></SvgIcon>;
+  if(n==="Burpees")return<SvgIcon s={s}><circle cx="12" cy="3" r="2"/><path d="M12 5v5"/><path d="M9 7l-3 3"/><path d="M15 7l3 3"/><path d="M12 10l-3 5h6l-3-5z"/></SvgIcon>;
+  if(n==="Lunges")return<SvgIcon s={s}><circle cx="9" cy="4" r="2"/><path d="M9 6v4"/><path d="M6 10l3 2 5-2"/><path d="M9 12l-2 8"/><path d="M14 10l2 10"/></SvgIcon>;
+  if(n==="Sit-ups")return<SvgIcon s={s}><circle cx="12" cy="5" r="2"/><path d="M4 20h16"/><path d="M8 20l4-8 4 4"/><path d="M12 12V7"/></SvgIcon>;
+  if(n==="Mountain Climbers")return<SvgIcon s={s}><circle cx="18" cy="6" r="2"/><path d="M3 18l6-6 3 2 5-8"/><path d="M21 18H3"/></SvgIcon>;
+  if(n==="High Knees")return<SvgIcon s={s}><circle cx="12" cy="4" r="2"/><path d="M12 6v4"/><path d="M9 10h6"/><path d="M9 10l-2 10"/><path d="M15 10l1 5-3 2"/></SvgIcon>;
+  if(n==="Jump Rope")return<SvgIcon s={s}><circle cx="12" cy="4" r="2"/><path d="M12 6v3"/><path d="M5 10c0 4 3 5 7 5s7-1 7-5"/><path d="M9 15l-1 5"/><path d="M15 15l1 5"/></SvgIcon>;
+  if(n==="Pull-ups")return<SvgIcon s={s}><line x1="3" y1="3" x2="21" y2="3"/><circle cx="12" cy="9" r="2"/><path d="M9 3v3l3 3 3-3V3"/><path d="M12 11v9"/></SvgIcon>;
+  if(n==="Dips")return<SvgIcon s={s}><path d="M5 5v12"/><path d="M19 5v12"/><circle cx="12" cy="9" r="2"/><path d="M9 5l3 4 3-4"/><path d="M12 11v8"/></SvgIcon>;
+  return<SvgIcon s={s}><circle cx="12" cy="12" r="9"/></SvgIcon>;
 };
 
-function FitLockApp() {
-  const [screen, setScreen] = useState('splash');
-  const [tab, setTab] = useState('home');
-  const [onboardStep, setOnboardStep] = useState(0);
-  const [earnedMinutes, setEarnedMinutes] = useState(23);
-  const [totalPushups, setTotalPushups] = useState(147);
-  const [streak, setStreak] = useState(7);
-  const [exerciseMode, setExerciseMode] = useState(null);
-  const [repCount, setRepCount] = useState(0);
-  const [isCounting, setIsCounting] = useState(false);
-  const [showUnlockModal, setShowUnlockModal] = useState(false);
-  const [selectedApp, setSelectedApp] = useState(null);
+const EXERCISES=[
+  {name:"Pushups",rate:"1 rep = 1 min",color:"from-orange-500 to-red-500"},
+  {name:"Squats",rate:"2 reps = 1 min",color:"from-blue-500 to-indigo-600"},
+  {name:"Jumping Jacks",rate:"3 reps = 1 min",color:"from-green-500 to-emerald-600"},
+  {name:"Plank",rate:"10 sec = 1 min",color:"from-purple-500 to-pink-600"},
+  {name:"Burpees",rate:"1 rep = 2 min",color:"from-red-500 to-rose-600"},
+  {name:"Lunges",rate:"2 reps = 1 min",color:"from-yellow-500 to-orange-500"},
+  {name:"Sit-ups",rate:"2 reps = 1 min",color:"from-teal-500 to-cyan-600"},
+  {name:"Mountain Climbers",rate:"3 reps = 1 min",color:"from-slate-500 to-slate-700"},
+  {name:"High Knees",rate:"4 reps = 1 min",color:"from-pink-500 to-rose-500"},
+  {name:"Jump Rope",rate:"10 reps = 1 min",color:"from-violet-500 to-purple-600"},
+  {name:"Pull-ups",rate:"1 rep = 2 min",color:"from-amber-500 to-yellow-600"},
+  {name:"Dips",rate:"1 rep = 1 min",color:"from-sky-500 to-blue-600"},
+];
 
-  // Profile state
-  const [profileName, setProfileName] = useState('Champion');
-  const [profileAvatar, setProfileAvatar] = useState('💪');
-  const [profileAvatarImage, setProfileAvatarImage] = useState(null);
-  const [profileLevel, setProfileLevel] = useState(7);
-  const [profileXP, setProfileXP] = useState(2340);
-  const [showEditProfile, setShowEditProfile] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [tempName, setTempName] = useState('');
-  const [tempAvatar, setTempAvatar] = useState('');
-  const [tempAvatarImage, setTempAvatarImage] = useState(null);
+const APPS=[
+  {name:"Instagram",color:"from-pink-500 to-purple-600",icon:"📷",locked:true,used:0,limit:30},
+  {name:"TikTok",color:"from-slate-900 to-slate-700",icon:"🎵",locked:true,used:0,limit:60},
+  {name:"YouTube",color:"from-red-500 to-red-700",icon:"▶️",locked:false,used:0,limit:45},
+  {name:"X (Twitter)",color:"from-slate-800 to-black",icon:"𝕏",locked:true,used:0,limit:20},
+  {name:"Reddit",color:"from-orange-500 to-red-600",icon:"🔶",locked:false,used:0,limit:30},
+  {name:"Snapchat",color:"from-yellow-400 to-yellow-500",icon:"👻",locked:true,used:0,limit:15},
+];
 
-  // Settings state
-  const [settings, setSettings] = useState({
-    notifications: true,
-    soundEffects: true,
-    hapticFeedback: true,
-    darkMode: false,
-    appleHealth: true,
-    strictMode: true,
-    weeklyEmails: false,
-    publicProfile: true,
-    exerciseReminders: true,
-    reminderTime: '18:00',
-    dailyGoal: 50,
-    language: 'English',
-    units: 'Metric',
-  });
+const PUZZLES=[
+  {type:"arithmetic",q:"If you have 3 apples, buy 4 more, then give away 2, how many do you have?",a:"5",hint:"Think step by step",d:1,min:3},
+  {type:"arithmetic",q:"A train travels 60 km/h. How far does it travel in 45 minutes?",a:"45",hint:"45 min = 0.75 hours",d:2,min:4},
+  {type:"arithmetic",q:"What is 15% of 240?",a:"36",hint:"10% = 24, 5% = 12",d:2,min:4},
+  {type:"arithmetic",q:"A shirt costs $80 after a 20% discount. What was the original price?",a:"100",hint:"80 = 80% of original",d:2,min:4},
+  {type:"sequence",q:"What comes next? 2, 4, 8, 16, __",a:"32",hint:"Each number doubles",d:1,min:3},
+  {type:"sequence",q:"What comes next? 1, 1, 2, 3, 5, 8, __",a:"13",hint:"Each = sum of previous two",d:2,min:4},
+  {type:"spatial",q:"A cube has 6 faces. How many edges does it have?",a:"12",hint:"Each face has 4 edges but shared",d:2,min:4},
+  {type:"spatial",q:"How many squares in a 3x3 grid? Count all sizes.",a:"14",hint:"9 small + 4 medium + 1 large",d:3,min:5},
+  {type:"reasoning",q:"A bat and ball cost $1.10. The bat costs $1 more. How much is the ball in cents?",a:"5",hint:"Don't say 10!",d:2,min:5},
+  {type:"reasoning",q:"If A > B and B > C, is A always > C? (yes/no)",a:"yes",hint:"Transitive property",d:1,min:3},
+  {type:"pattern",q:"ABACABA — what letter comes next?",a:"C",hint:"Look at structure A-B-A-C-A-B-A",d:2,min:4},
+];
 
-  // Realistic calorie calculation: ~0.32 calories per pushup for average adult
-  // Source: Harvard Medical School, ACSM guidelines
-  const calculatedCalories = Math.round(totalPushups * 0.32);
+const AVATARS=["💪","🔥","⚡","🎯","🚀","👑","🏆","🥊","🏋️","🧘","🦁","🐺","🦅","🐉","⚔️","🛡️","💎","🌟"];
 
-  // Pose detection state
-  const [cameraStatus, setCameraStatus] = useState('idle');
-  const [modelStatus, setModelStatus] = useState('idle');
-  const [feedback, setFeedback] = useState('');
-  const [detectedConfidence, setDetectedConfidence] = useState(0);
-  const [debugInfo, setDebugInfo] = useState({ angle: 0, state: 'ready', leftAngle: 0, rightAngle: 0 });
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const detectorRef = useRef(null);
-  const animationRef = useRef(null);
-  const poseStateRef = useRef('ready');
-  const lastRepTimeRef = useRef(0);
+function App(){
+  const [screen,setScreen]=useState("splash");
+  const [tab,setTab]=useState("home");
+  const [step,setStep]=useState(0);
+  const [mins,setMins]=useState(0);
+  const [pushups,setPushups]=useState(0);
+  const [streak,setStreak]=useState(0);
+  const [ex,setEx]=useState(null);
+  const [reps,setReps]=useState(0);
+  const [counting,setCounting]=useState(false);
+  const [showUnlock,setShowUnlock]=useState(false);
+  const [selApp,setSelApp]=useState(null);
+  const [name,setName]=useState("Champion");
+  const [avatar,setAvatar]=useState("💪");
+  const [bio,setBio]=useState("");
+  const [goal,setGoal]=useState("");
+  const [showEdit,setShowEdit]=useState(false);
+  const [showSettings,setShowSettings]=useState(false);
+  const [showSupport,setShowSupport]=useState(false);
+  const [supportPage,setSupportPage]=useState(null);
+  const [tName,setTName]=useState("");
+  const [tAvatar,setTAvatar]=useState("");
+  const [cfg,setCfg]=useState({notifs:true,sound:true,haptic:true,dark:false,health:true,strict:true,reminders:true,goal:50});
+  const [puzzleMode,setPuzzleMode]=useState(false);
+  const [puzzle,setPuzzle]=useState(null);
+  const [ans,setAns]=useState("");
+  const [result,setResult]=useState(null);
+  const [solved,setSolved]=useState(0);
+  const [camStatus,setCamStatus]=useState("idle");
+  const [angle,setAngle]=useState(0);
+  const [starRating,setStarRating]=useState(0);
+  const videoRef=useRef(null);
+  const canvasRef=useRef(null);
+  const detRef=useRef(null);
+  const animRef=useRef(null);
+  const poseRef=useRef("ready");
+  const lastRepRef=useRef(0);
+  const demoRef=useRef(null);
 
-  useEffect(() => {
-    if (screen === 'splash') {
-      const t = setTimeout(() => setScreen('onboard'), 2000);
-      return () => clearTimeout(t);
-    }
-  }, [screen]);
+  // Apply dark mode to body
+  useEffect(()=>{
+    if(cfg.dark){document.body.classList.add("dark-mode");}
+    else{document.body.classList.remove("dark-mode");}
+  },[cfg.dark]);
 
-  // Load TensorFlow.js MoveNet model when entering exercise mode
-  useEffect(() => {
-    if (!exerciseMode) return;
+  // Haptic feedback helper
+  const haptic=(dur=10)=>{
+    if(cfg.haptic&&navigator.vibrate)navigator.vibrate(dur);
+  };
 
-    const loadModel = async () => {
-      setModelStatus('loading');
-      setFeedback('Loading AI pose detection...');
+  // Sound helper (uses Web Audio API)
+  const playSound=(type)=>{
+    if(!cfg.sound)return;
+    try{
+      const ctx=new(window.AudioContext||window.webkitAudioContext)();
+      const o=ctx.createOscillator();
+      const g=ctx.createGain();
+      o.connect(g);g.connect(ctx.destination);
+      if(type==="rep"){o.frequency.value=660;g.gain.setValueAtTime(0.15,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.15);o.start();o.stop(ctx.currentTime+0.15);}
+      else if(type==="claim"){o.frequency.value=523;g.gain.setValueAtTime(0.2,ctx.currentTime);o.frequency.exponentialRampToValueAtTime(1046,ctx.currentTime+0.3);g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.4);o.start();o.stop(ctx.currentTime+0.4);}
+    }catch{}
+  };
 
-      try {
+  const cal=Math.round(pushups*0.32);
+  const trees=Math.floor(pushups/1000);
+  const treesPend=((pushups%1000)/1000).toFixed(2);
+
+  useEffect(()=>{
+    if(screen==="splash"){const t=setTimeout(()=>setScreen("onboard"),2000);return()=>clearTimeout(t);}
+  },[screen]);
+
+  useEffect(()=>{
+    if(!ex){cleanup();return;}
+    setCamStatus("loading");poseRef.current="ready";setAngle(0);
+    (async()=>{
+      try{
+        if(!window.tf)await load("https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.20.0/tf.min.js");
+        if(!window.poseDetection)await load("https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js");
         await window.tf.ready();
-        try {
-          await window.tf.setBackend('webgl');
-        } catch (e) {
-          await window.tf.setBackend('cpu');
-        }
+        try{await window.tf.setBackend("webgl");}catch{await window.tf.setBackend("cpu");}
+        detRef.current=await window.poseDetection.createDetector(window.poseDetection.SupportedModels.MoveNet,{modelType:window.poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING});
+        setCamStatus("ready");
+      }catch(e){setCamStatus("error");}
+    })();
+    return()=>cleanup();
+  },[ex]);
 
-        const detector = await window.poseDetection.createDetector(
-          window.poseDetection.SupportedModels.MoveNet,
-          {
-            modelType: window.poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
-          }
-        );
+  const load=src=>new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s);});
 
-        detectorRef.current = detector;
-        setModelStatus('ready');
-        setFeedback('Model loaded! Enable camera to start.');
-      } catch (err) {
-        console.error('Model loading error:', err);
-        setModelStatus('error');
-        setFeedback('Failed to load AI model. You can still use demo mode below.');
-      }
-    };
-
-    loadModel();
-
-    return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-      if (videoRef.current?.srcObject) {
-        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, [exerciseMode]);
-
-  const calculateAngle = (a, b, c) => {
-    const radians = Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(a.y - b.y, a.x - b.x);
-    let angle = Math.abs(radians * 180 / Math.PI);
-    if (angle > 180) angle = 360 - angle;
-    return angle;
+  const cleanup=()=>{
+    if(animRef.current)cancelAnimationFrame(animRef.current);
+    if(demoRef.current)clearInterval(demoRef.current);
+    if(videoRef.current?.srcObject){videoRef.current.srcObject.getTracks().forEach(t=>t.stop());videoRef.current.srcObject=null;}
+    setCamStatus("idle");setCounting(false);
   };
 
-  const startPoseDetection = async () => {
-    if (!detectorRef.current) {
-      setFeedback('Model not ready yet. Please wait...');
-      return;
-    }
-
-    setCameraStatus('loading');
-    setFeedback('Starting camera...');
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
-        audio: false
-      });
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await new Promise((resolve) => {
-          videoRef.current.onloadedmetadata = () => {
-            videoRef.current.play();
-            resolve();
-          };
-        });
-      }
-
-      setCameraStatus('ready');
-      setIsCounting(true);
-      setFeedback('Get into pushup position...');
-      poseStateRef.current = 'ready';
-      detectPose();
-    } catch (err) {
-      console.error('Camera error:', err);
-      setCameraStatus(err.name === 'NotAllowedError' ? 'denied' : 'error');
-      setFeedback(err.name === 'NotAllowedError' ? 'Camera access denied.' : 'Could not access camera.');
-    }
+  const startCam=async()=>{
+    if(!detRef.current)return;
+    setCamStatus("starting");
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user"},audio:false});
+      videoRef.current.srcObject=stream;
+      await new Promise(res=>{videoRef.current.onloadedmetadata=()=>{videoRef.current.play();res();};});
+      setCamStatus("active");setCounting(true);loop();
+    }catch(e){setCamStatus(e.name==="NotAllowedError"?"denied":"error");}
   };
 
-  const detectPose = async () => {
-    if (!videoRef.current || !detectorRef.current || !canvasRef.current) {
-      animationRef.current = requestAnimationFrame(detectPose);
-      return;
-    }
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-
-    if (video.readyState !== 4) {
-      animationRef.current = requestAnimationFrame(detectPose);
-      return;
-    }
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    try {
-      const poses = await detectorRef.current.estimatePoses(video);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      if (poses && poses.length > 0) {
-        const keypoints = poses[0].keypoints;
-        drawSkeleton(ctx, keypoints, canvas.width, canvas.height);
-
-        // Get arm keypoints
-        const leftShoulder = keypoints.find(k => k.name === 'left_shoulder');
-        const leftElbow = keypoints.find(k => k.name === 'left_elbow');
-        const leftWrist = keypoints.find(k => k.name === 'left_wrist');
-        const rightShoulder = keypoints.find(k => k.name === 'right_shoulder');
-        const rightElbow = keypoints.find(k => k.name === 'right_elbow');
-        const rightWrist = keypoints.find(k => k.name === 'right_wrist');
-
-        // LOWER threshold - just need to see arms
-        const MIN_CONFIDENCE = 0.3;
-
-        // Check which arm is visible (use whichever has better confidence)
-        const leftArmVisible = leftShoulder && leftElbow && leftWrist &&
-          leftShoulder.score > MIN_CONFIDENCE && leftElbow.score > MIN_CONFIDENCE && leftWrist.score > MIN_CONFIDENCE;
-        const rightArmVisible = rightShoulder && rightElbow && rightWrist &&
-          rightShoulder.score > MIN_CONFIDENCE && rightElbow.score > MIN_CONFIDENCE && rightWrist.score > MIN_CONFIDENCE;
-
-        if (!leftArmVisible && !rightArmVisible) {
-          setFeedback('👋 Show me your arm(s)');
-          setDebugInfo({ angle: 0, state: poseStateRef.current, leftAngle: 0, rightAngle: 0 });
-          animationRef.current = requestAnimationFrame(detectPose);
-          return;
-        }
-
-        // Calculate angle - use whichever arm is visible
-        let avgAngle = 0;
-        let leftAngle = 0;
-        let rightAngle = 0;
-
-        if (leftArmVisible && rightArmVisible) {
-          leftAngle = calculateAngle(leftShoulder, leftElbow, leftWrist);
-          rightAngle = calculateAngle(rightShoulder, rightElbow, rightWrist);
-          avgAngle = (leftAngle + rightAngle) / 2;
-        } else if (leftArmVisible) {
-          leftAngle = calculateAngle(leftShoulder, leftElbow, leftWrist);
-          avgAngle = leftAngle;
-        } else {
-          rightAngle = calculateAngle(rightShoulder, rightElbow, rightWrist);
-          avgAngle = rightAngle;
-        }
-
-        // Update debug info
-        setDebugInfo({
-          angle: Math.round(avgAngle),
-          state: poseStateRef.current,
-          leftAngle: Math.round(leftAngle),
-          rightAngle: Math.round(rightAngle)
-        });
-
-        const now = Date.now();
-
-        // SIMPLE rep detection:
-        // UP position: arms straight (angle > 140°)
-        // DOWN position: arms bent (angle < 100°)
-        // Need UP -> DOWN -> UP for a rep
-
-        if (avgAngle > 140) {
-          // Arms are extended (UP position)
-          if (poseStateRef.current === 'down') {
-            // Just came back up from down = REP COMPLETE!
-            if (now - lastRepTimeRef.current > 600) {
-              setRepCount(r => r + 1);
-              lastRepTimeRef.current = now;
-              setFeedback('💪 Rep counted! Keep going!');
-            }
-            poseStateRef.current = 'up';
-          } else {
-            poseStateRef.current = 'up';
-            setFeedback(`⬇️ Now bend your arms (angle: ${Math.round(avgAngle)}°)`);
-          }
-        } else if (avgAngle < 100) {
-          // Arms are bent (DOWN position)
-          poseStateRef.current = 'down';
-          setFeedback(`⬆️ Now extend your arms (angle: ${Math.round(avgAngle)}°)`);
-        } else {
-          // In transition
-          if (poseStateRef.current === 'up') {
-            setFeedback(`⬇️ Bend more... (angle: ${Math.round(avgAngle)}°)`);
-          } else if (poseStateRef.current === 'down') {
-            setFeedback(`⬆️ Extend more... (angle: ${Math.round(avgAngle)}°)`);
-          } else {
-            setFeedback(`Extend your arms to start (angle: ${Math.round(avgAngle)}°)`);
-          }
-        }
-      } else {
-        setFeedback('👋 Position yourself in frame');
-        setDebugInfo({ angle: 0, state: poseStateRef.current, leftAngle: 0, rightAngle: 0 });
-      }
-    } catch (err) {
-      console.error('Detection error:', err);
-    }
-
-    animationRef.current = requestAnimationFrame(detectPose);
+  const stopCam=()=>{
+    if(animRef.current)cancelAnimationFrame(animRef.current);
+    if(videoRef.current?.srcObject){videoRef.current.srcObject.getTracks().forEach(t=>t.stop());videoRef.current.srcObject=null;}
+    setCamStatus("ready");setCounting(false);
   };
 
-  const drawSkeleton = (ctx, keypoints, width, height) => {
-    // Only body connections - NO face connections
-    const connections = [
-      ['left_shoulder', 'right_shoulder'],
-      ['left_shoulder', 'left_elbow'],
-      ['left_elbow', 'left_wrist'],
-      ['right_shoulder', 'right_elbow'],
-      ['right_elbow', 'right_wrist'],
-      ['left_shoulder', 'left_hip'],
-      ['right_shoulder', 'right_hip'],
-      ['left_hip', 'right_hip'],
-      ['left_hip', 'left_knee'],
-      ['left_knee', 'left_ankle'],
-      ['right_hip', 'right_knee'],
-      ['right_knee', 'right_ankle'],
-    ];
+  const ang=(a,b,c)=>{let r=Math.atan2(c.y-b.y,c.x-b.x)-Math.atan2(a.y-b.y,a.x-b.x);let d=Math.abs(r*180/Math.PI);return d>180?360-d:d;};
 
-    // Body keypoints only - exclude face (nose, eyes, ears)
-    const bodyKeypoints = [
-      'left_shoulder', 'right_shoulder',
-      'left_elbow', 'right_elbow',
-      'left_wrist', 'right_wrist',
-      'left_hip', 'right_hip',
-      'left_knee', 'right_knee',
-      'left_ankle', 'right_ankle',
-    ];
-
-    ctx.save();
-    ctx.scale(-1, 1);
-    ctx.translate(-width, 0);
-
-    ctx.strokeStyle = '#fb923c';
-    ctx.lineWidth = 4;
-    ctx.lineCap = 'round';
-
-    connections.forEach(([a, b]) => {
-      const pointA = keypoints.find(k => k.name === a);
-      const pointB = keypoints.find(k => k.name === b);
-      if (pointA && pointB && pointA.score > 0.3 && pointB.score > 0.3) {
-        ctx.beginPath();
-        ctx.moveTo(pointA.x, pointA.y);
-        ctx.lineTo(pointB.x, pointB.y);
-        ctx.stroke();
+  const loop=async()=>{
+    if(!videoRef.current||!detRef.current||!canvasRef.current){animRef.current=requestAnimationFrame(loop);return;}
+    const v=videoRef.current,c=canvasRef.current,ctx=c.getContext("2d");
+    if(v.readyState!==4){animRef.current=requestAnimationFrame(loop);return;}
+    c.width=v.videoWidth;c.height=v.videoHeight;
+    try{
+      const poses=await detRef.current.estimatePoses(v);
+      ctx.clearRect(0,0,c.width,c.height);
+      if(poses?.length){
+        const kps=poses[0].keypoints;
+        drawSkel(ctx,kps,c.width,c.height);
+        const ls=kps.find(k=>k.name==="left_shoulder"),le=kps.find(k=>k.name==="left_elbow"),lw=kps.find(k=>k.name==="left_wrist");
+        const rs=kps.find(k=>k.name==="right_shoulder"),re=kps.find(k=>k.name==="right_elbow"),rw=kps.find(k=>k.name==="right_wrist");
+        const lOk=ls&&le&&lw&&ls.score>.3&&le.score>.3&&lw.score>.3;
+        const rOk=rs&&re&&rw&&rs.score>.3&&re.score>.3&&rw.score>.3;
+        if(lOk||rOk){
+          let avg=lOk&&rOk?(ang(ls,le,lw)+ang(rs,re,rw))/2:lOk?ang(ls,le,lw):ang(rs,re,rw);
+          setAngle(Math.round(avg));
+          const now=Date.now();
+          if(avg>140&&poseRef.current==="down"&&now-lastRepRef.current>700){setReps(r=>r+1);lastRepRef.current=now;poseRef.current="up";playSound("rep");haptic(15);}
+          else if(avg<100&&poseRef.current!=="down")poseRef.current="down";
+          else if(avg>140&&poseRef.current==="ready")poseRef.current="up";
+        }
       }
-    });
+    }catch{}
+    animRef.current=requestAnimationFrame(loop);
+  };
 
-    // Only draw body keypoints, skip face
-    keypoints.forEach(keypoint => {
-      if (keypoint.score > 0.3 && bodyKeypoints.includes(keypoint.name)) {
-        ctx.beginPath();
-        ctx.arc(keypoint.x, keypoint.y, 6, 0, 2 * Math.PI);
-        ctx.fillStyle = '#ef4444';
-        ctx.fill();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
-    });
-
+  const drawSkel=(ctx,kps,w,h)=>{
+    const conns=[["left_shoulder","right_shoulder"],["left_shoulder","left_elbow"],["left_elbow","left_wrist"],["right_shoulder","right_elbow"],["right_elbow","right_wrist"],["left_shoulder","left_hip"],["right_shoulder","right_hip"],["left_hip","right_hip"],["left_hip","left_knee"],["left_knee","left_ankle"],["right_hip","right_knee"],["right_knee","right_ankle"]];
+    const body=["left_shoulder","right_shoulder","left_elbow","right_elbow","left_wrist","right_wrist","left_hip","right_hip","left_knee","right_knee","left_ankle","right_ankle"];
+    ctx.save();ctx.scale(-1,1);ctx.translate(-w,0);
+    ctx.strokeStyle="#fb923c";ctx.lineWidth=4;ctx.lineCap="round";
+    conns.forEach(([a,b])=>{const pa=kps.find(k=>k.name===a),pb=kps.find(k=>k.name===b);if(pa&&pb&&pa.score>.3&&pb.score>.3){ctx.beginPath();ctx.moveTo(pa.x,pa.y);ctx.lineTo(pb.x,pb.y);ctx.stroke();}});
+    kps.forEach(k=>{if(k.score>.3&&body.includes(k.name)){ctx.beginPath();ctx.arc(k.x,k.y,6,0,2*Math.PI);ctx.fillStyle="#ef4444";ctx.fill();ctx.strokeStyle="#fff";ctx.lineWidth=2;ctx.stroke();}});
     ctx.restore();
   };
 
-  const stopPoseDetection = () => {
-    if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    if (videoRef.current?.srcObject) {
-      videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
-    setCameraStatus('idle');
-    setIsCounting(false);
-  };
+  const startDemo=()=>{setCamStatus("demo");setCounting(true);demoRef.current=setInterval(()=>{setReps(r=>{if(r>=10){clearInterval(demoRef.current);setCounting(false);return r;}playSound("rep");haptic(15);return r+1;});},800);};
 
-  const exitExercise = () => {
-    stopPoseDetection();
-    setExerciseMode(null);
-    setRepCount(0);
-    setFeedback('');
-  };
+  const claim=()=>{cleanup();setMins(m=>m+reps);setPushups(p=>p+reps);setStreak(s=>s+1);setEx(null);setReps(0);playSound("claim");haptic(50);};
 
-  const blockedApps = [
-    { name: 'Instagram', color: 'from-pink-500 to-purple-600', icon: '📷', locked: true, used: 12, limit: 30 },
-    { name: 'TikTok', color: 'from-slate-900 to-slate-700', icon: '🎵', locked: true, used: 45, limit: 60 },
-    { name: 'YouTube', color: 'from-red-500 to-red-700', icon: '▶️', locked: false, used: 20, limit: 45 },
-    { name: 'X (Twitter)', color: 'from-slate-800 to-black', icon: '𝕏', locked: true, used: 8, limit: 20 },
-    { name: 'Reddit', color: 'from-orange-500 to-red-600', icon: '🔶', locked: false, used: 15, limit: 30 },
-    { name: 'Snapchat', color: 'from-yellow-400 to-yellow-500', icon: '👻', locked: true, used: 5, limit: 15 },
-  ];
+  const rndP=(type)=>{const pool=type?PUZZLES.filter(p=>p.type===type):PUZZLES;return pool[Math.floor(Math.random()*pool.length)];};
 
-  const exercises = [
-    { name: 'Pushups', icon: '💪', rate: '1 rep = 1 min', color: 'from-orange-500 to-red-500' },
-    { name: 'Squats', icon: '🦵', rate: '2 reps = 1 min', color: 'from-blue-500 to-indigo-600' },
-    { name: 'Jumping Jacks', icon: '🤸', rate: '3 reps = 1 min', color: 'from-green-500 to-emerald-600' },
-    { name: 'Plank', icon: '🧘', rate: '10 sec = 1 min', color: 'from-purple-500 to-pink-600' },
-  ];
+  const checkAns=()=>{const ok=ans.trim().toLowerCase()===puzzle.a.toString().toLowerCase();setResult(ok?"correct":"wrong");if(ok)setSolved(n=>n+1);};
 
-  const squads = [
-    { name: 'Alex', avatar: '🔥', pushups: 234, rank: 1 },
-    { name: 'You', avatar: '💪', pushups: 147, rank: 2, isUser: true },
-    { name: 'Jordan', avatar: '⚡', pushups: 112, rank: 3 },
-    { name: 'Sam', avatar: '🎯', pushups: 89, rank: 4 },
-    { name: 'Riley', avatar: '🚀', pushups: 67, rank: 5 },
-  ];
+  const share=()=>{const url="https://fitlock-five.vercel.app";const txt="Join me on FitLock! Do pushups to unlock your apps.\n\n"+url;if(navigator.share)navigator.share({title:"FitLock",text:txt,url});else{navigator.clipboard.writeText(txt);alert("Link copied!\n"+url);}};
 
-  if (screen === 'splash') {
-    return (
-      <div className="w-full min-h-screen bg-gradient-to-br from-orange-500 via-red-500 to-pink-600 flex items-center justify-center p-4">
-        <div className="text-center animate-in">
-          <div className="w-24 h-24 mx-auto mb-4 bg-white/20 backdrop-blur-xl rounded-3xl flex items-center justify-center shadow-2xl pulse-ring">
-            <Icon name="Dumbbell" className="w-14 h-14 text-white" strokeWidth={2.5} />
-          </div>
-          <h1 className="text-5xl font-black text-white tracking-tight">FitLock</h1>
-          <p className="text-white/90 font-semibold mt-2 tracking-wide">SWEAT TO SCROLL</p>
+  const Tog=({k})=><button onClick={()=>setCfg(c=>({...c,[k]:!c[k]}))} className={`w-12 h-7 rounded-full relative transition-colors ${cfg[k]?"bg-orange-500":"bg-slate-300"}`}><div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow transition-all ${cfg[k]?"right-0.5":"left-0.5"}`}/></button>;
+
+  /* ── SCREENS ── */
+  if(screen==="splash")return(
+    <div className="w-full min-h-screen bg-gradient-to-br from-orange-500 via-red-500 to-pink-600 flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-24 h-24 mx-auto mb-4 bg-white/20 rounded-3xl flex items-center justify-center">
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.4 14.4 9.6 9.6M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829zM21.5 21.5l-1.4-1.4M3.9 3.9 2.5 2.5M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/></svg>
         </div>
+        <h1 className="text-5xl font-black text-white">FitLock</h1>
+        <p className="text-white/90 font-semibold mt-2 tracking-wide">SWEAT TO SCROLL</p>
       </div>
-    );
-  }
+    </div>
+  );
 
-  if (screen === 'onboard') {
-    const steps = [
-      { icon: <Icon name="Flame" className="w-20 h-20 text-orange-500" />, title: "You're losing 10+ years", subtitle: 'The average person spends 5-6 hours daily on their phone. That\'s a decade of your life, gone.', cta: 'Shocking', bg: 'from-orange-50 to-red-50' },
-      { icon: <Icon name="Dumbbell" className="w-20 h-20 text-red-500" />, title: 'Trade pushups for scrolls', subtitle: 'Want to open TikTok? Earn it. Every rep unlocks a minute. Build muscle instead of losing time.', cta: "I'm ready", bg: 'from-red-50 to-pink-50' },
-      { icon: <Icon name="Users" className="w-20 h-20 text-indigo-500" />, title: 'Join your Squad', subtitle: 'Compete with friends, share streaks, keep each other accountable. Transformation is a team sport.', cta: 'Count me in', bg: 'from-indigo-50 to-purple-50' },
-      { icon: <Icon name="Sparkles" className="w-20 h-20 text-emerald-500" />, title: 'Start your transformation', subtitle: 'In 90 days, you could lose screen time addiction and gain visible muscle. Let\'s go.', cta: 'Begin journey', bg: 'from-emerald-50 to-teal-50' }
+  if(screen==="onboard"){
+    const steps=[
+      {icon:"🔥",title:"You are losing 9+ years",sub:"The average person spends 5-6 hours daily on their phone. That is nearly a decade of your life, gone.",cta:"Shocking",bg:"from-orange-50 to-red-50"},
+      {icon:"💪",title:"Trade pushups for scrolls",sub:"Want to open TikTok? Earn it. Every rep unlocks a minute.",cta:"I am ready",bg:"from-red-50 to-pink-50"},
+      {icon:"👥",title:"Join your Squad",sub:"Compete with friends, share streaks, keep each other accountable.",cta:"Count me in",bg:"from-indigo-50 to-purple-50"},
+      {icon:"✨",title:"Start your transformation",sub:"In 90 days, you could lose screen time addiction and gain visible muscle.",cta:"Begin journey",bg:"from-emerald-50 to-teal-50"},
     ];
-
-    const step = steps[onboardStep];
-
-    return (
-      <div className={`w-full min-h-screen bg-gradient-to-br ${step.bg} flex flex-col p-6`}>
+    const s=steps[step];
+    return(
+      <div className={`w-full min-h-screen bg-gradient-to-br ${s.bg} flex flex-col p-6`}>
         <div className="flex items-center justify-between pt-4">
-          <button onClick={() => onboardStep > 0 ? setOnboardStep(onboardStep - 1) : setScreen('splash')} className="w-10 h-10 bg-white/80 backdrop-blur rounded-full flex items-center justify-center shadow-sm">
-            <Icon name="ArrowLeft" />
-          </button>
-          <div className="flex gap-2">
-            {steps.map((_, i) => (
-              <div key={i} className={`h-1.5 rounded-full transition-all ${i === onboardStep ? 'w-8 bg-slate-900' : 'w-1.5 bg-slate-300'}`} />
-            ))}
-          </div>
-          <button onClick={() => setScreen('main')} className="text-sm text-slate-500 font-medium">Skip</button>
+          <button onClick={()=>step>0?setStep(step-1):setScreen("splash")} className="w-10 h-10 bg-white/80 rounded-full flex items-center justify-center text-xl">←</button>
+          <div className="flex gap-2">{steps.map((_,i)=><div key={i} className={`h-1.5 rounded-full transition-all ${i===step?"w-8 bg-slate-900":"w-1.5 bg-slate-300"}`}/>)}</div>
+          <button onClick={()=>setScreen("main")} className="text-sm text-slate-500">Skip</button>
         </div>
-
         <div className="flex-1 flex flex-col items-center justify-center text-center">
-          <div className="mb-8 bg-white rounded-3xl p-8 shadow-xl">{step.icon}</div>
-          <h1 className="text-4xl font-black text-slate-900 mb-4 tracking-tight leading-tight">{step.title}</h1>
-          <p className="text-lg text-slate-600 max-w-sm leading-relaxed">{step.subtitle}</p>
+          <div className="mb-8 bg-white rounded-3xl p-8 shadow-xl text-7xl">{s.icon}</div>
+          <h1 className="text-4xl font-black text-slate-900 mb-4 leading-tight">{s.title}</h1>
+          <p className="text-lg text-slate-600 max-w-sm leading-relaxed">{s.sub}</p>
         </div>
-
-        <button onClick={() => { if (onboardStep < steps.length - 1) setOnboardStep(onboardStep + 1); else setScreen('main'); }} className="w-full bg-slate-900 text-white font-bold py-5 rounded-2xl shadow-xl active:scale-95 transition-transform flex items-center justify-center gap-2">
-          {step.cta}<Icon name="ChevronRight" />
+        <button onClick={()=>{if(step<steps.length-1)setStep(step+1);else setScreen("main");}} className="w-full bg-slate-900 text-white font-bold py-5 rounded-2xl flex items-center justify-center gap-2">
+          {s.cta} →
         </button>
       </div>
     );
   }
 
-  if (exerciseMode) {
-    return (
-      <div className="w-full min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex flex-col p-6 relative overflow-hidden">
-        <div className="flex items-center justify-between z-20">
-          <button onClick={exitExercise} className="w-10 h-10 bg-white/10 backdrop-blur rounded-full flex items-center justify-center">
-            <Icon name="X" className="w-5 h-5 text-white" />
-          </button>
-          <div className="bg-white/10 backdrop-blur px-3 py-1.5 rounded-full border border-white/20">
-            <p className="text-white text-xs font-bold tracking-wider">
-              {modelStatus === 'ready' && cameraStatus === 'ready' ? '🟢 AI ACTIVE' :
-                modelStatus === 'loading' ? '🟡 LOADING AI' :
-                  modelStatus === 'error' ? '🔴 AI ERROR' : '⚪ AI IDLE'}
-            </p>
-          </div>
-          <div className="w-10" />
+  if(showSupport){
+    const pages={
+      "Help Center":<div className="space-y-4">{[
+        {q:"How do I earn screen time?",a:"Complete exercises or mind puzzles. Each rep or solved puzzle earns you minutes."},
+        {q:"How does pose detection work?",a:"FitLock uses your camera with AI to count reps. Nothing is recorded — all processing happens on your device."},
+        {q:"Why won't the camera work?",a:"Allow camera permission in browser settings, then try again."},
+        {q:"What is Strict Mode?",a:"Strict Mode prevents you from unblocking apps even if you delete FitLock."},
+        {q:"How does the streak work?",a:"Complete at least one workout per day to maintain your streak. Missing a day resets it."},
+        {q:"How are trees planted?",a:"Every 1000 pushups = 1 real tree planted through our charity partner."},
+      ].map((item,i)=><div key={i} className="bg-slate-50 rounded-2xl p-4"><p className="font-black text-slate-900 mb-2">Q: {item.q}</p><p className="text-slate-600 text-sm leading-relaxed">A: {item.a}</p></div>)}</div>,
+      "Contact Us":<div className="space-y-4">
+        <div className="bg-green-50 rounded-2xl p-5 text-center"><div className="text-5xl mb-3">💬</div><h3 className="font-black text-slate-900 mb-2">We love hearing from you!</h3><p className="text-slate-600 text-sm">Typically respond within 24 hours.</p></div>
+        {[{icon:"📧",label:"Email",value:"support@fitlock.app"},{icon:"🐦",label:"Twitter",value:"@fitlockapp"},{icon:"💬",label:"Discord",value:"discord.gg/fitlock"},{icon:"📱",label:"Instagram",value:"@fitlock.app"}].map((item,i)=>(
+          <div key={i} className="bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-slate-100"><div className="text-3xl">{item.icon}</div><div><p className="font-black text-slate-900">{item.label}</p><p className="text-orange-600 font-bold text-sm">{item.value}</p></div></div>
+        ))}
+        <div className="bg-slate-50 rounded-2xl p-4">
+          <p className="font-black text-slate-900 mb-3">Send a message</p>
+          <input type="text" placeholder="Your name" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm mb-2 focus:outline-none"/>
+          <input type="email" placeholder="Your email" className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm mb-2 focus:outline-none"/>
+          <textarea placeholder="How can we help?" rows={3} className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm mb-3 focus:outline-none resize-none"/>
+          <button className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black py-3 rounded-xl">Send Message</button>
         </div>
-
-        <div className="text-center mt-4 mb-4 z-20">
-          <h1 className="text-3xl font-black text-white">{exerciseMode.name}</h1>
-          <p className="text-white/60 text-sm">{exerciseMode.rate}</p>
+      </div>,
+      "Rate App":<div className="space-y-4">
+        <div className="bg-yellow-50 rounded-2xl p-6 text-center"><div className="text-6xl mb-3">⭐</div><h3 className="font-black text-slate-900 text-xl mb-2">Enjoying FitLock?</h3></div>
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+          <p className="font-black text-slate-900 mb-4 text-center">Rate FitLock</p>
+          <div className="flex justify-center gap-2 mb-4">{[1,2,3,4,5].map(s=><button key={s} onClick={()=>setStarRating(s)} className={`text-4xl transition-transform hover:scale-110 ${s<=starRating?"opacity-100":"opacity-30"}`}>⭐</button>)}</div>
+          <textarea placeholder="Tell us what you think..." rows={3} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm mb-3 focus:outline-none resize-none"/>
+          <button className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-black py-4 rounded-xl">Rate on App Store</button>
         </div>
-
-        <div className="relative flex-1 rounded-3xl overflow-hidden bg-black border-2 border-white/20 mb-4 min-h-[280px]">
-          <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} playsInline muted />
-          <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover pointer-events-none" />
-
-          {cameraStatus !== 'ready' && (
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-slate-800 flex flex-col items-center justify-center p-6 text-center">
-              {modelStatus === 'loading' && (
-                <>
-                  <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4" />
-                  <p className="text-white font-bold">Loading AI Model</p>
-                  <p className="text-white/60 text-sm mt-1">TensorFlow.js + MoveNet</p>
-                </>
-              )}
-              {modelStatus === 'ready' && cameraStatus === 'idle' && (
-                <>
-                  <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mb-4">
-                    <Icon name="Camera" className="w-8 h-8 text-orange-400" />
-                  </div>
-                  <p className="text-white font-bold text-lg">Camera Access Needed</p>
-                  <p className="text-white/60 text-sm mt-1 max-w-xs">We use your camera to count reps. Nothing is recorded or sent anywhere.</p>
-                </>
-              )}
-              {cameraStatus === 'loading' && (
-                <>
-                  <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4" />
-                  <p className="text-white font-bold">Starting Camera...</p>
-                </>
-              )}
-              {cameraStatus === 'denied' && (
-                <>
-                  <Icon name="CameraOff" className="w-12 h-12 text-red-400 mb-3" />
-                  <p className="text-white font-bold">Camera Blocked</p>
-                  <p className="text-white/60 text-sm mt-1 max-w-xs">Allow camera in browser settings, or use demo mode.</p>
-                </>
-              )}
-              {(cameraStatus === 'error' || modelStatus === 'error') && (
-                <>
-                  <Icon name="AlertCircle" className="w-12 h-12 text-yellow-400 mb-3" />
-                  <p className="text-white font-bold">Couldn't start AI detection</p>
-                  <p className="text-white/60 text-sm mt-1 max-w-xs">Use demo mode below to simulate reps</p>
-                </>
-              )}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+          <h4 className="font-black text-slate-900 mb-4">What others say</h4>
+          {[{name:"Ali A.",r:5,review:"Best app I downloaded this year. Lost 5kg just from earning screen time!",date:"6 days ago"},{name:"Nggchn",r:5,review:"Very good! Changed my relationship with my phone.",date:"29 Mar"},{name:"FitFan",r:4,review:"Love the mind puzzles!",date:"2 weeks ago"}].map((rv,i,arr)=>(
+            <div key={i} className={`py-3 ${i!==arr.length-1?"border-b border-slate-100":""}`}>
+              <div className="flex justify-between mb-1"><p className="font-bold text-slate-900 text-sm">{rv.name}</p><p className="text-xs text-slate-400">{rv.date}</p></div>
+              <p className="text-xs mb-1">{"⭐".repeat(rv.r)}</p>
+              <p className="text-slate-600 text-sm">{rv.review}</p>
             </div>
-          )}
-
-          {cameraStatus === 'ready' && (
-            <>
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
-                <div className="bg-black/60 backdrop-blur-xl rounded-2xl px-8 py-3 border border-white/20">
-                  <p className="text-white/60 text-xs text-center tracking-widest">REPS</p>
-                  <p className="text-6xl font-black text-white text-center leading-none">{repCount}</p>
-                </div>
-              </div>
-
-              {/* Debug Panel - shows live angle data */}
-              <div className="absolute top-4 left-4 z-10">
-                <div className="bg-black/70 backdrop-blur-xl rounded-xl px-3 py-2 border border-white/20">
-                  <p className="text-white/60 text-[10px] tracking-widest font-bold mb-1">DEBUG</p>
-                  <div className="space-y-0.5 font-mono">
-                    <p className="text-white text-xs">
-                      Angle: <span className={`font-black ${debugInfo.angle > 140 ? 'text-green-400' : debugInfo.angle < 100 ? 'text-orange-400' : 'text-yellow-400'}`}>{debugInfo.angle}°</span>
-                    </p>
-                    <p className="text-white text-xs">
-                      State: <span className={`font-black uppercase ${debugInfo.state === 'up' ? 'text-green-400' : debugInfo.state === 'down' ? 'text-orange-400' : 'text-slate-400'}`}>{debugInfo.state}</span>
-                    </p>
-                    <p className="text-white/60 text-[10px]">L:{debugInfo.leftAngle}° R:{debugInfo.rightAngle}°</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Manual +1 button for fallback testing */}
-              <div className="absolute top-4 right-4 z-10">
-                <button
-                  onClick={() => setRepCount(r => r + 1)}
-                  className="bg-orange-500/90 backdrop-blur text-white font-black px-3 py-2 rounded-xl border border-white/20 shadow-lg active:scale-95 transition-transform"
-                >
-                  +1
-                </button>
-              </div>
-
-              <div className="absolute bottom-4 left-4 right-4 z-10">
-                <div className="bg-black/60 backdrop-blur-xl rounded-2xl px-4 py-3 border border-white/20">
-                  <p className="text-white font-semibold text-sm text-center">{feedback || 'Get ready...'}</p>
-                </div>
-              </div>
-            </>
-          )}
+          ))}
         </div>
-
-        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 border border-white/20 mb-4 z-20">
+      </div>,
+      "Terms of Service":<div className="space-y-4">
+        <div className="bg-slate-50 rounded-2xl p-4"><p className="text-xs text-slate-500 font-bold">Last updated: January 1, 2026</p></div>
+        {[["1. Acceptance","By downloading or using FitLock, you agree to these Terms."],["2. Service","FitLock is a screen time management app that uses exercise to earn device usage time."],["3. Age","You must be at least 13 to use FitLock. Under 18 requires parental consent."],["4. Camera","Camera is used only for pose detection. Nothing is recorded or transmitted."],["5. Subscriptions","Subscriptions auto-renew. Cancellation must be 24 hours before renewal."],["6. Health","FitLock is not a medical application. Consult a doctor before exercising."],["7. Contact","Questions? Email legal@fitlock.app"]].map(([t,b],i)=>(
+          <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100"><p className="font-black text-slate-900 mb-2">{t}</p><p className="text-slate-600 text-sm leading-relaxed">{b}</p></div>
+        ))}
+      </div>,
+      "Privacy Policy":<div className="space-y-4">
+        <div className="bg-purple-50 rounded-2xl p-4 border border-purple-100"><p className="font-black text-purple-900 mb-1">Your Privacy Matters</p><p className="text-purple-700 text-sm">We collect the minimum data necessary.</p></div>
+        {[{t:"What We Collect",items:["Account info (name, email)","Workout stats (reps, streaks, calories)","App preferences and settings"]},{t:"What We Don't Collect",items:["Camera footage (never recorded)","Screen content","Location data","Personal messages"]},{t:"Your Rights",items:["Access your data in Settings","Delete your account and all data","Contact privacy@fitlock.app"]}].map((sec,i)=>(
+          <div key={i} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
+            <p className="font-black text-slate-900 mb-3">{sec.t}</p>
+            <div className="space-y-2">{sec.items.map((item,j)=><div key={j} className="flex items-start gap-2"><div className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-2 flex-shrink-0"/><p className="text-slate-600 text-sm">{item}</p></div>)}</div>
+          </div>
+        ))}
+      </div>,
+    };
+    return(
+      <div className="w-full min-h-screen bg-slate-50">
+        <div className="sticky top-0 bg-white z-10 px-6 pt-4 pb-3 border-b border-slate-100">
+          <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto mb-4"/>
           <div className="flex items-center justify-between">
-            <div className="text-left">
-              <p className="text-white/60 text-xs tracking-wider">EARNED</p>
-              <p className="text-2xl font-black text-white">+{repCount} min</p>
-            </div>
-            <div className="w-px h-10 bg-white/20" />
-            <div className="text-left">
-              <p className="text-white/60 text-xs tracking-wider">UNLOCKS</p>
-              <p className="text-lg font-black text-white">Instagram</p>
-            </div>
+            <button onClick={()=>{if(supportPage)setSupportPage(null);else{setShowSupport(false);setShowSettings(true);}}} className="text-slate-500 font-semibold flex items-center gap-1">← {supportPage?"Back":"Settings"}</button>
+            <h2 className="text-lg font-black">{supportPage||"Support"}</h2>
+            <div className="w-16"/>
           </div>
         </div>
-
-        <div className="z-20 space-y-2">
-          {cameraStatus === 'idle' && modelStatus === 'ready' && repCount === 0 && (
-            <button onClick={startPoseDetection} className="w-full bg-gradient-to-r from-orange-500 to-red-600 text-white font-black py-5 rounded-2xl shadow-2xl active:scale-95 transition-transform flex items-center justify-center gap-2 text-lg">
-              <Icon name="Camera" className="w-6 h-6" />
-              ENABLE CAMERA & START
-            </button>
-          )}
-
-          {(modelStatus === 'loading' || cameraStatus === 'loading') && (
-            <button disabled className="w-full bg-white/10 text-white/60 font-bold py-5 rounded-2xl border border-white/10">
-              Loading AI...
-            </button>
-          )}
-
-          {cameraStatus === 'ready' && isCounting && (
-            <button onClick={stopPoseDetection} className="w-full bg-white/10 backdrop-blur text-white font-bold py-5 rounded-2xl border border-white/20 flex items-center justify-center gap-2">
-              <Icon name="Pause" className="w-5 h-5" />
-              Pause Workout
-            </button>
-          )}
-
-          {repCount > 0 && !isCounting && (
-            <button onClick={() => { setEarnedMinutes(earnedMinutes + repCount); setTotalPushups(totalPushups + repCount); exitExercise(); }} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black py-5 rounded-2xl shadow-2xl active:scale-95 transition-transform text-lg flex items-center justify-center gap-2">
-              <Icon name="Check" className="w-6 h-6" />
-              CLAIM {repCount} MINUTES
-            </button>
-          )}
-
-          {(cameraStatus === 'error' || cameraStatus === 'denied' || modelStatus === 'error') && repCount === 0 && (
-            <button onClick={() => {
-              setIsCounting(true);
-              setCameraStatus('demo');
-              setFeedback('Demo mode: simulating reps...');
-              const interval = setInterval(() => {
-                setRepCount(r => {
-                  if (r >= 10) { clearInterval(interval); setIsCounting(false); return r; }
-                  return r + 1;
-                });
-              }, 800);
-            }} className="w-full bg-white/10 backdrop-blur text-white font-bold py-4 rounded-2xl border border-white/20 flex items-center justify-center gap-2">
-              <Icon name="Play" className="w-5 h-5" />
-              Try Demo Mode (No Camera)
-            </button>
-          )}
-        </div>
-
-        <p className="text-white/40 text-xs text-center mt-3 z-20">
-          🔒 On-device AI · TensorFlow.js MoveNet · Nothing recorded
-        </p>
+        {!supportPage?(
+          <div className="p-6 space-y-3">
+            <div className="bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl p-5 text-center mb-6">
+              <div className="text-5xl mb-3">🤝</div>
+              <h3 className="font-black text-white text-xl">How can we help?</h3>
+            </div>
+            {[{k:"Help Center",icon:"❓",desc:"FAQs and guides",c:"bg-blue-100 text-blue-600"},{k:"Contact Us",icon:"💬",desc:"Chat with support",c:"bg-green-100 text-green-600"},{k:"Rate App",icon:"⭐",desc:"Love FitLock?",c:"bg-yellow-100 text-yellow-600"},{k:"Terms of Service",icon:"📄",desc:"Terms & conditions",c:"bg-slate-100 text-slate-600"},{k:"Privacy Policy",icon:"🔒",desc:"How we handle data",c:"bg-purple-100 text-purple-600"}].map(item=>(
+              <button key={item.k} onClick={()=>setSupportPage(item.k)} className="w-full bg-white rounded-2xl p-4 flex items-center gap-4 shadow-sm border border-slate-100">
+                <div className={`w-12 h-12 ${item.c} rounded-xl flex items-center justify-center text-2xl`}>{item.icon}</div>
+                <div className="flex-1 text-left"><p className="font-black text-slate-900">{item.k}</p><p className="text-slate-500 text-xs mt-0.5">{item.desc}</p></div>
+                <span className="text-slate-300">›</span>
+              </button>
+            ))}
+          </div>
+        ):(
+          <div className="p-6 pb-20">{pages[supportPage]}</div>
+        )}
       </div>
     );
   }
 
-  const UnlockModal = () => {
-    if (!showUnlockModal || !selectedApp) return null;
-    return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center animate-in" style={{maxWidth:'430px',margin:'0 auto'}}>
-        <div className="bg-white w-full rounded-t-3xl p-6 slide-up">
-          <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto mb-6" />
-          <div className="text-center mb-6">
-            <div className={`w-20 h-20 mx-auto mb-4 bg-gradient-to-br ${selectedApp.color} rounded-3xl flex items-center justify-center text-4xl shadow-xl`}>{selectedApp.icon}</div>
-            <h2 className="text-2xl font-black text-slate-900">{selectedApp.name} is locked</h2>
-            <p className="text-slate-500 mt-1">Earn minutes to unlock</p>
-          </div>
-
-          <div className="bg-slate-50 rounded-2xl p-4 mb-4">
-            <p className="text-xs font-bold text-slate-500 tracking-wider mb-3">CHOOSE YOUR METHOD</p>
-            <div className="space-y-2">
-              {exercises.slice(0, 2).map((ex, i) => (
-                <button key={i} onClick={() => { setShowUnlockModal(false); setExerciseMode(ex); }} className="w-full bg-white rounded-xl p-4 flex items-center gap-3 active:scale-95 transition-transform">
-                  <div className={`w-12 h-12 bg-gradient-to-br ${ex.color} rounded-xl flex items-center justify-center text-2xl`}>{ex.icon}</div>
-                  <div className="flex-1 text-left">
-                    <p className="font-bold text-slate-900">{ex.name}</p>
-                    <p className="text-xs text-slate-500">{ex.rate}</p>
-                  </div>
-                  <Icon name="ChevronRight" className="w-5 h-5 text-slate-400" />
+  if(puzzleMode){
+    const diff=puzzle?(puzzle.d===1?"Easy":puzzle.d===2?"Medium":"Hard"):"";
+    const dc=puzzle?(puzzle.d===1?"text-green-300":puzzle.d===2?"text-yellow-300":"text-red-300"):"";
+    return(
+      <div className="w-full min-h-screen bg-gradient-to-br from-indigo-900 to-purple-900 flex flex-col p-6">
+        <div className="flex items-center justify-between mb-6">
+          <button onClick={()=>{setPuzzleMode(false);setPuzzle(null);setAns("");setResult(null);}} className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white text-xl">✕</button>
+          <div className="bg-white/10 px-3 py-1.5 rounded-full"><p className="text-white text-xs font-bold">🧠 MIND WORKOUT</p></div>
+          <div className="bg-white/10 px-3 py-1.5 rounded-full"><p className="text-white text-xs font-bold">{solved} solved</p></div>
+        </div>
+        {!puzzle?(
+          <div className="flex-1 flex flex-col items-center justify-center text-center">
+            <div className="text-8xl mb-6">🧠</div>
+            <h1 className="text-3xl font-black text-white mb-3">Mind Puzzles</h1>
+            <p className="text-white/70 mb-2 max-w-xs">Solve puzzles to earn screen time!</p>
+            <p className="text-indigo-300 font-bold text-sm mb-8">Each puzzle = 3-5 minutes earned</p>
+            <div className="w-full grid grid-cols-2 gap-3 mb-6">
+              {[{type:"arithmetic",label:"Arithmetic",icon:"🔢",color:"from-blue-500 to-indigo-600"},{type:"sequence",label:"Sequences",icon:"🔄",color:"from-green-500 to-teal-600"},{type:"spatial",label:"Spatial",icon:"📐",color:"from-orange-500 to-red-500"},{type:"reasoning",label:"Reasoning",icon:"🧩",color:"from-purple-500 to-pink-600"}].map(cat=>(
+                <button key={cat.type} onClick={()=>{setPuzzle(rndP(cat.type));setAns("");setResult(null);}} className="bg-white/10 rounded-2xl p-4 border border-white/20 text-left">
+                  <div className={`w-10 h-10 bg-gradient-to-br ${cat.color} rounded-xl flex items-center justify-center text-xl mb-2`}>{cat.icon}</div>
+                  <p className="text-white font-bold text-sm">{cat.label}</p>
                 </button>
               ))}
-              <button className="w-full bg-white rounded-xl p-4 flex items-center gap-3 active:scale-95 transition-transform">
-                <div className="w-12 h-12 bg-gradient-to-br from-sky-400 to-blue-500 rounded-xl flex items-center justify-center">
-                  <Icon name="Wind" className="w-6 h-6 text-white" />
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="font-bold text-slate-900">Breathing Exercise</p>
-                  <p className="text-xs text-slate-500">60 sec mindful pause = 3 min</p>
-                </div>
-                <Icon name="ChevronRight" className="w-5 h-5 text-slate-400" />
-              </button>
             </div>
+            <button onClick={()=>{setPuzzle(rndP());setAns("");setResult(null);}} className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-black py-5 rounded-2xl text-lg">🎲 Random Puzzle</button>
           </div>
-
-          <button onClick={() => setShowUnlockModal(false)} className="w-full bg-slate-100 text-slate-700 font-bold py-4 rounded-2xl">Not now</button>
-        </div>
+        ):(
+          <div className="flex-1 flex flex-col">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="bg-white/10 text-white text-xs font-bold px-3 py-1 rounded-full">{puzzle.type}</span>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full bg-white/10 ${dc}`}>{diff}</span>
+              <span className="ml-auto bg-green-500/20 text-green-300 text-xs font-bold px-3 py-1 rounded-full">+{puzzle.min} min</span>
+            </div>
+            <div className="bg-white/10 rounded-3xl p-6 border border-white/20 mb-6 flex-1 flex flex-col justify-center">
+              <p className="text-white/60 text-xs font-bold tracking-widest mb-4">QUESTION</p>
+              <p className="text-white text-xl font-bold leading-relaxed">{puzzle.q}</p>
+            </div>
+            {result==="correct"&&<div className="bg-green-500/20 border border-green-500/40 rounded-2xl p-4 mb-4 text-center"><p className="text-green-300 font-black text-lg">🎉 Correct! +{puzzle.min} minutes!</p><p className="text-green-400/80 text-sm mt-1">Answer: {puzzle.a}</p></div>}
+            {result==="wrong"&&<div className="bg-red-500/20 border border-red-500/40 rounded-2xl p-4 mb-4 text-center"><p className="text-red-300 font-black">Not quite! Try again</p><p className="text-red-400/80 text-sm mt-1">Hint: {puzzle.hint}</p></div>}
+            {result!=="correct"&&(
+              <div className="mb-4">
+                <input type="text" value={ans} onChange={e=>{setAns(e.target.value);setResult(null);}} placeholder="Type your answer..." className="w-full bg-white/10 border-2 border-white/20 rounded-2xl px-4 py-4 text-white text-lg font-bold placeholder-white/40 focus:border-indigo-400 focus:outline-none mb-3"/>
+                <button onClick={checkAns} disabled={!ans.trim()} className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-black py-4 rounded-2xl disabled:opacity-40">Submit Answer</button>
+              </div>
+            )}
+            {result&&(
+              <div className="space-y-3">
+                {result==="correct"&&<button onClick={()=>{setMins(m=>m+puzzle.min);setPuzzleMode(false);setPuzzle(null);setAns("");setResult(null);}} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black py-4 rounded-2xl">✓ Claim {puzzle.min} Minutes!</button>}
+                <button onClick={()=>{setPuzzle(rndP());setAns("");setResult(null);}} className="w-full bg-white/10 text-white font-bold py-4 rounded-2xl border border-white/20">Next Puzzle →</button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
-  };
+  }
 
-  return (
-    <div className="w-full min-h-screen bg-slate-50 relative">
-      <UnlockModal />
+  if(ex)return(
+    <div className="w-full min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex flex-col p-6">
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={()=>{cleanup();setEx(null);setReps(0);}} className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white text-xl">✕</button>
+        <div className={`px-3 py-1.5 rounded-full border border-white/20 ${camStatus==="active"?"bg-green-500/20":"bg-white/10"}`}>
+          <p className="text-white text-xs font-bold">{camStatus==="loading"?"LOADING AI...":camStatus==="active"?"🟢 AI ACTIVE":camStatus==="error"?"🔴 ERROR":camStatus==="denied"?"🔴 DENIED":camStatus==="demo"?"DEMO MODE":"⚪ IDLE"}</p>
+        </div>
+        <div className="w-10"/>
+      </div>
+      <div className="text-center mb-4">
+        <h1 className="text-3xl font-black text-white">{ex.name}</h1>
+        <p className="text-white/60 text-sm">{ex.rate}</p>
+      </div>
+      <div className="relative rounded-3xl overflow-hidden bg-black border-2 border-white/20 mb-4" style={{minHeight:240}}>
+        <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" style={{transform:"scaleX(-1)"}} playsInline muted/>
+        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover pointer-events-none"/>
+        {camStatus!=="active"&&(
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
+            {(camStatus==="loading"||camStatus==="starting")&&<><div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4"/><p className="text-white font-bold">{camStatus==="loading"?"Loading AI Model...":"Starting Camera..."}</p></>}
+            {camStatus==="ready"&&<><div className="text-5xl mb-3">📷</div><p className="text-white font-bold text-lg">Camera Access Needed</p><p className="text-white/60 text-sm mt-1 max-w-xs">Nothing is recorded. All processing is on-device.</p></>}
+            {camStatus==="denied"&&<><div className="text-5xl mb-3">🚫</div><p className="text-white font-bold">Camera Denied</p><p className="text-white/60 text-sm mt-1">Allow camera in browser settings.</p></>}
+            {camStatus==="error"&&<><p className="text-white font-bold text-lg mb-2">AI model failed to load</p><p className="text-white/60 text-sm">Use demo mode below</p></>}
+            {camStatus==="demo"&&<><div className="text-8xl font-black text-white">{reps}</div><p className="text-white/60 text-sm mt-2">DEMO REPS</p></>}
+          </div>
+        )}
+        {camStatus==="active"&&<>
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+            <div className="bg-black/60 rounded-2xl px-8 py-2 border border-white/20 text-center">
+              <p className="text-white/60 text-xs tracking-widest">REPS</p>
+              <p className="text-6xl font-black text-white leading-none">{reps}</p>
+            </div>
+          </div>
+          <div className="absolute top-4 left-4 z-10 bg-black/60 rounded-xl px-3 py-2 border border-white/20">
+            <p className="text-white/60 text-[10px] font-bold tracking-wider">ANGLE</p>
+            <p className={`text-lg font-black ${angle>140?"text-green-400":angle<100?"text-orange-400":"text-yellow-400"}`}>{angle}°</p>
+          </div>
+          <div className="absolute bottom-4 left-4 right-4 z-10 bg-black/60 rounded-2xl px-4 py-3 border border-white/20">
+            <p className="text-white font-semibold text-sm text-center">{angle>140?"⬇️ Go down":angle<100?"⬆️ Push up!":"Keep moving..."}</p>
+          </div>
+        </>}
+      </div>
+      <div className="bg-white/10 rounded-2xl p-4 border border-white/20 mb-4">
+        <div className="flex items-center justify-between">
+          <div><p className="text-white/60 text-xs tracking-wider">EARNED</p><p className="text-2xl font-black text-white">+{reps} min</p></div>
+          <div className="w-px h-10 bg-white/20"/>
+          <div><p className="text-white/60 text-xs tracking-wider">EXERCISE</p><p className="text-lg font-black text-white">{ex.name}</p></div>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {camStatus==="ready"&&<button onClick={startCam} className="w-full bg-gradient-to-r from-orange-500 to-red-600 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-2 text-lg">📷 ENABLE CAMERA AND START</button>}
+        {camStatus==="active"&&<button onClick={stopCam} className="w-full bg-white/10 text-white font-bold py-5 rounded-2xl border border-white/20">⏸ Pause Workout</button>}
+        {reps>0&&camStatus!=="active"&&camStatus!=="loading"&&camStatus!=="starting"&&<button onClick={claim} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black py-5 rounded-2xl flex items-center justify-center gap-2 text-lg">✓ CLAIM {reps} MINUTES</button>}
+        {(camStatus==="error"||camStatus==="denied")&&reps===0&&<button onClick={startDemo} className="w-full bg-white/10 text-white font-bold py-4 rounded-2xl border border-white/20">▶ Try Demo Mode</button>}
+      </div>
+      <p className="text-white/40 text-xs text-center mt-3">On-device AI · TensorFlow.js MoveNet · Nothing recorded</p>
+    </div>
+  );
 
-      {tab === 'home' && (
+  if(showEdit)return(
+    <div className="w-full min-h-screen bg-slate-50 flex flex-col">
+      <div className="sticky top-0 bg-white z-10 px-6 pt-4 pb-3 border-b border-slate-100">
+        <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto mb-4"/>
+        <div className="flex items-center justify-between">
+          <button onClick={()=>setShowEdit(false)} className="text-slate-500 font-semibold">Cancel</button>
+          <h2 className="text-lg font-black">Edit Profile</h2>
+          <button onClick={()=>{setName(tName.trim()||"Champion");setAvatar(tAvatar||avatar);setShowEdit(false);}} className="text-orange-600 font-bold">Save</button>
+        </div>
+      </div>
+      <div className="px-6 py-6 overflow-y-auto">
+        <div className="flex flex-col items-center mb-6">
+          <div className="w-28 h-28 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center text-6xl border-4 border-white shadow-2xl">{tAvatar||avatar}</div>
+          <p className="text-sm text-slate-500 mt-3">Tap an avatar below to change</p>
+        </div>
+        <label className="text-xs font-black text-slate-500 tracking-widest block mb-3">CHOOSE AVATAR</label>
+        <div className="grid grid-cols-6 gap-2 mb-6">{AVATARS.map(e=><button key={e} onClick={()=>setTAvatar(e)} className={`aspect-square rounded-xl flex items-center justify-center text-2xl ${tAvatar===e?"bg-orange-500 scale-110":"bg-slate-100"}`}>{e}</button>)}</div>
+        <label className="text-xs font-black text-slate-500 tracking-widest block mb-2">DISPLAY NAME</label>
+        <input type="text" value={tName} onChange={e=>setTName(e.target.value.slice(0,20))} placeholder="Enter your name" className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 font-semibold focus:border-orange-500 focus:outline-none mb-1"/>
+        <p className="text-xs text-slate-400 text-right mb-6">{tName.length}/20</p>
+        <label className="text-xs font-black text-slate-500 tracking-widest block mb-2">BIO</label>
+        <textarea value={bio} onChange={e=>setBio(e.target.value)} placeholder="I am on a journey to reclaim my time" maxLength={100} rows={3} className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 focus:border-orange-500 focus:outline-none resize-none mb-6"/>
+        <label className="text-xs font-black text-slate-500 tracking-widest block mb-2">FITNESS GOAL</label>
+        <div className="grid grid-cols-2 gap-2 mb-6">{[{label:"Build muscle",icon:"💪"},{label:"Lose weight",icon:"⚖️"},{label:"Break addiction",icon:"🔓"},{label:"Stay focused",icon:"🎯"}].map(g=><button key={g.label} onClick={()=>setGoal(g.label)} className={`p-3 rounded-xl flex items-center gap-2 ${goal===g.label?"bg-orange-100 border-2 border-orange-400":"bg-slate-50"}`}><span className="text-xl">{g.icon}</span><span className="text-sm font-semibold">{g.label}</span></button>)}</div>
+        <div className="border-t border-slate-100 pt-6">
+          <label className="text-xs font-black text-red-500 tracking-widest block mb-2">DANGER ZONE</label>
+          <button onClick={()=>{if(window.confirm("Reset all progress?")){{setPushups(0);setMins(0);setStreak(0);setShowEdit(false);}};}} className="w-full p-4 bg-red-50 text-red-600 font-bold rounded-xl">Reset All Progress</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  if(showSettings)return(
+    <div className="w-full min-h-screen bg-slate-50 dm-settings-bg">
+      <div className="sticky top-0 bg-white z-10 px-6 pt-4 pb-3 border-b border-slate-100 dm-settings-header dm-border">
+        <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto mb-4"/>
+        <div className="flex items-center justify-between">
+          <button onClick={()=>setShowSettings(false)} className="text-slate-500 dm-text-muted font-semibold flex items-center gap-1">← Back</button>
+          <h2 className="text-lg font-black dm-text">Settings</h2>
+          <div className="w-16"/>
+        </div>
+      </div>
+      <div className="px-6 py-6 space-y-6 pb-20">
+        {[{label:"APP PREFERENCES",items:[{k:"notifs",l:"Push Notifications",d:"Get reminders"},{k:"sound",l:"Sound Effects",d:"Sounds during workouts"},{k:"haptic",l:"Haptic Feedback",d:"Vibration on interactions"},{k:"dark",l:"Dark Mode",d:"Use dark theme"}]},{label:"SCREEN TIME",items:[{k:"strict",l:"Strict Mode",d:"Cannot unblock easily"},{k:"health",l:"Apple Health",d:"Sync workouts"}]}].map(sec=>(
+          <div key={sec.label}>
+            <p className="text-xs font-black text-slate-500 dm-section-label tracking-widest mb-3">{sec.label}</p>
+            <div className="bg-white rounded-2xl overflow-hidden dm-bg-card">
+              {sec.items.map((item,i,arr)=>(
+                <div key={item.k} className={`flex items-center gap-3 p-4 ${i!==arr.length-1?"border-b border-slate-100 dm-border":""}`}>
+                  <div className="flex-1"><p className="font-bold text-slate-900 dm-text text-sm">{item.l}</p><p className="text-xs text-slate-500 dm-text-muted">{item.d}</p></div>
+                  <Tog k={item.k}/>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        <div>
+          <p className="text-xs font-black text-slate-500 dm-section-label tracking-widest mb-3">WORKOUT</p>
+          <div className="bg-white rounded-2xl overflow-hidden dm-bg-card">
+            <div className="flex items-center gap-3 p-4 border-b border-slate-100 dm-border">
+              <div className="flex-1"><p className="font-bold text-slate-900 dm-text text-sm">Exercise Reminders</p><p className="text-xs text-slate-500 dm-text-muted">Daily notifications</p></div>
+              <Tog k="reminders"/>
+            </div>
+            <div className="p-4">
+              <p className="font-bold text-slate-900 dm-text text-sm mb-2">Daily Goal: {cfg.goal} pushups</p>
+              <input type="range" min="10" max="200" step="10" value={cfg.goal} onChange={e=>setCfg(c=>({...c,goal:parseInt(e.target.value)}))} className="w-full accent-orange-500"/>
+            </div>
+          </div>
+        </div>
+        <div>
+          <p className="text-xs font-black text-slate-500 dm-section-label tracking-widest mb-3">SUPPORT</p>
+          <div className="bg-white rounded-2xl overflow-hidden dm-bg-card">
+            {[{k:"Help Center",icon:"❓"},{k:"Contact Us",icon:"💬"},{k:"Rate App",icon:"⭐"},{k:"Terms of Service",icon:"📄"},{k:"Privacy Policy",icon:"🔒"}].map((item,i,arr)=>(
+              <button key={item.k} onClick={()=>{setShowSettings(false);setSupportPage(item.k);setShowSupport(true);}} className={`w-full flex items-center gap-3 p-4 ${i!==arr.length-1?"border-b border-slate-100 dm-border":""}`}>
+                <span className="text-xl">{item.icon}</span>
+                <p className="flex-1 text-left font-semibold text-slate-900 dm-text text-sm">{item.k}</p>
+                <span className="text-slate-400 dm-chevron">›</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <button className="w-full p-4 bg-red-50 text-red-600 font-bold rounded-2xl">Delete Account</button>
+        <p className="text-xs text-slate-400 dm-text-muted text-center">Made with 💪 by FitLock · v1.0.0</p>
+      </div>
+    </div>
+  );
+
+  /* ── MAIN APP ── */
+  return(
+    <div className="w-full min-h-screen bg-slate-50 dm-bg relative">
+      {showUnlock&&selApp&&(
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center">
+          <div className="bg-white w-full rounded-t-3xl p-6 dm-bg-card">
+            <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto mb-6 dm-surface"/>
+            <div className="text-center mb-6">
+              <div className={`w-20 h-20 mx-auto mb-4 bg-gradient-to-br ${selApp.color} rounded-3xl flex items-center justify-center text-4xl shadow-xl`}>{selApp.icon}</div>
+              <h2 className="text-2xl font-black text-slate-900 dm-text">{selApp.name} is locked</h2>
+              <p className="text-slate-500 dm-text-muted mt-1">Choose how to unlock</p>
+            </div>
+            <div className="space-y-2 mb-4">
+              {EXERCISES.slice(0,2).map((e,i)=>(
+                <button key={i} onClick={()=>{setShowUnlock(false);setEx(e);}} className="w-full bg-slate-50 rounded-xl p-4 flex items-center gap-3 dm-surface">
+                  <div className={`w-12 h-12 bg-gradient-to-br ${e.color} rounded-xl flex items-center justify-center`}><Ico n={e.name} s={22}/></div>
+                  <div className="flex-1 text-left"><p className="font-bold text-slate-900 dm-text">{e.name}</p><p className="text-xs text-slate-500 dm-text-muted">{e.rate}</p></div>
+                  <span className="text-slate-300 dm-chevron">›</span>
+                </button>
+              ))}
+              <button onClick={()=>{setShowUnlock(false);setPuzzleMode(true);setPuzzle(null);}} className="w-full bg-slate-50 rounded-xl p-4 flex items-center gap-3 dm-surface">
+                <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-2xl">🧠</div>
+                <div className="flex-1 text-left"><p className="font-bold text-slate-900 dm-text">Mind Puzzle</p><p className="text-xs text-slate-500 dm-text-muted">Solve puzzles = earn minutes</p></div>
+                <span className="text-slate-300 dm-chevron">›</span>
+              </button>
+            </div>
+            <button onClick={()=>setShowUnlock(false)} className="w-full bg-slate-100 text-slate-700 dm-surface dm-text font-bold py-4 rounded-2xl">Not now</button>
+          </div>
+        </div>
+      )}
+
+      {tab==="home"&&(
         <div className="pb-24">
           <div className="bg-gradient-to-br from-orange-500 via-red-500 to-pink-600 px-6 pt-12 pb-8 rounded-b-[2.5rem] shadow-xl">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <p className="text-white/80 text-sm font-medium">Welcome back</p>
-                <h1 className="text-3xl font-black text-white">Morning, Champion 🔥</h1>
+                <p className="text-white/80 text-sm">Welcome back</p>
+                <h1 className="text-3xl font-black text-white">Morning, {name} {avatar}</h1>
               </div>
-              <button className="w-11 h-11 bg-white/20 backdrop-blur rounded-full flex items-center justify-center relative">
-                <Icon name="Bell" className="w-5 h-5 text-white" />
-                <div className="absolute top-2 right-2 w-2 h-2 bg-yellow-400 rounded-full" />
+              <button onClick={()=>setShowSettings(true)} className="w-11 h-11 bg-white/20 rounded-full flex items-center justify-center relative">
+                <span className="text-white text-xl">🔔</span>
+                {cfg.notifs&&<div className="absolute top-2 right-2 w-2 h-2 bg-yellow-400 rounded-full"/>}
               </button>
             </div>
-
-            <div className="bg-white/15 backdrop-blur-xl rounded-2xl p-5 border border-white/20">
+            <div className="bg-white/15 rounded-2xl p-5 border border-white/20">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-white/80 text-xs tracking-widest font-bold">CURRENT STREAK</p>
-                  <div className="flex items-baseline gap-1 mt-1">
-                    <p className="text-5xl font-black text-white">{streak}</p>
-                    <p className="text-white/80 font-semibold">days</p>
-                  </div>
+                  <div className="flex items-baseline gap-1 mt-1"><p className="text-5xl font-black text-white">{streak}</p><p className="text-white/80">days</p></div>
                 </div>
                 <div className="text-6xl">🔥</div>
               </div>
-              <div className="mt-4 flex gap-1">
-                {[...Array(7)].map((_, i) => (<div key={i} className="flex-1 h-1.5 bg-white rounded-full" />))}
-                {[...Array(3)].map((_, i) => (<div key={i} className="flex-1 h-1.5 bg-white/30 rounded-full" />))}
-              </div>
-              <p className="text-white/80 text-xs mt-2">3 days to 10-day milestone 🏆</p>
+              <div className="mt-4 flex gap-1">{[...Array(10)].map((_,i)=><div key={i} className={`flex-1 h-1.5 rounded-full ${i<streak?"bg-white":"bg-white/30"}`}/>)}</div>
             </div>
           </div>
 
-          <div className="px-6 -mt-4 relative z-10">
+          <div className="px-6 -mt-4 z-10 relative">
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white rounded-2xl p-4 shadow-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <Icon name="Dumbbell" className="w-4 h-4 text-orange-600" />
-                  </div>
-                  <p className="text-xs font-bold text-slate-500 tracking-wider">PUSHUPS</p>
-                </div>
-                <p className="text-2xl font-black text-slate-900">{totalPushups}</p>
-                <p className="text-xs text-green-600 font-semibold">↑ 23 today</p>
-              </div>
-              <div className="bg-white rounded-2xl p-4 shadow-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Icon name="Clock" className="w-4 h-4 text-blue-600" />
-                  </div>
-                  <p className="text-xs font-bold text-slate-500 tracking-wider">EARNED</p>
-                </div>
-                <p className="text-2xl font-black text-slate-900">{earnedMinutes}<span className="text-sm text-slate-400"> min</span></p>
-                <p className="text-xs text-slate-500 font-semibold">available now</p>
-              </div>
+              <div className="bg-white rounded-2xl p-4 shadow-lg dm-bg-card"><div className="flex items-center gap-2 mb-2"><div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">💪</div><p className="text-xs font-bold text-slate-500 dm-text-muted tracking-wider">PUSHUPS</p></div><p className="text-2xl font-black text-slate-900 dm-text">{pushups}</p></div>
+              <div className="bg-white rounded-2xl p-4 shadow-lg dm-bg-card"><div className="flex items-center gap-2 mb-2"><div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">⏱</div><p className="text-xs font-bold text-slate-500 dm-text-muted tracking-wider">EARNED</p></div><p className="text-2xl font-black text-slate-900 dm-text">{mins}<span className="text-sm text-slate-400 dm-text-muted"> min</span></p></div>
             </div>
           </div>
 
           <div className="px-6 mt-6">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-black text-slate-900">Quick Unlock</h2>
-              <button className="text-xs font-bold text-slate-500">See all</button>
-            </div>
+            <button onClick={()=>{setPuzzleMode(true);setPuzzle(null);}} className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-5 flex items-center gap-4 shadow-xl">
+              <div className="text-5xl">🧠</div>
+              <div className="flex-1 text-left">
+                <p className="text-white font-black text-lg">Can't exercise?</p>
+                <p className="text-white/80 text-sm">Solve mind puzzles to earn screen time</p>
+                <p className="text-indigo-200 text-xs mt-1 font-bold">Boost IQ · Reasoning · Spatial Awareness</p>
+              </div>
+              <span className="text-white text-xl">›</span>
+            </button>
+          </div>
+
+          <div className="px-6 mt-6">
+            <h2 className="text-lg font-black text-slate-900 dm-text mb-3">Quick Unlock</h2>
             <div className="grid grid-cols-3 gap-3">
-              {exercises.slice(0, 3).map((ex, i) => (
-                <button key={i} onClick={() => setExerciseMode(ex)} className="bg-white rounded-2xl p-4 shadow-sm active:scale-95 transition-transform">
-                  <div className={`w-12 h-12 mx-auto mb-2 bg-gradient-to-br ${ex.color} rounded-xl flex items-center justify-center text-2xl shadow-lg`}>{ex.icon}</div>
-                  <p className="text-xs font-bold text-slate-900 text-center">{ex.name}</p>
+              {EXERCISES.map((e,i)=>(
+                <button key={i} onClick={()=>setEx(e)} className="bg-white rounded-2xl p-4 shadow-sm dm-bg-card">
+                  <div className={`w-12 h-12 mx-auto mb-2 bg-gradient-to-br ${e.color} rounded-xl flex items-center justify-center shadow-lg`}><Ico n={e.name} s={22}/></div>
+                  <p className="text-xs font-bold text-slate-900 dm-text text-center">{e.name}</p>
+                  <p className="text-[10px] text-slate-400 dm-text-muted text-center mt-0.5">{e.rate}</p>
                 </button>
               ))}
             </div>
@@ -824,28 +684,18 @@ function FitLockApp() {
 
           <div className="px-6 mt-6">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-black text-slate-900">Your Apps</h2>
-              <button className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                <Icon name="Plus" className="w-3 h-3" /> Add
-              </button>
+              <h2 className="text-lg font-black text-slate-900 dm-text">Your Apps</h2>
+              <button className="text-xs font-bold text-slate-500 dm-text-muted">+ Add</button>
             </div>
             <div className="space-y-2">
-              {blockedApps.map((app, i) => (
-                <button key={i} onClick={() => { setSelectedApp(app); setShowUnlockModal(true); }} className="w-full bg-white rounded-2xl p-4 shadow-sm flex items-center gap-3 active:scale-95 transition-transform">
+              {APPS.map((app,i)=>(
+                <button key={i} onClick={()=>{setSelApp(app);setShowUnlock(true);}} className="w-full bg-white rounded-2xl p-4 shadow-sm flex items-center gap-3 dm-bg-card">
                   <div className={`w-12 h-12 bg-gradient-to-br ${app.color} rounded-xl flex items-center justify-center text-xl shadow-md`}>{app.icon}</div>
                   <div className="flex-1 text-left">
-                    <div className="flex items-center gap-2">
-                      <p className="font-bold text-slate-900">{app.name}</p>
-                      {app.locked ? <Icon name="Lock" className="w-3.5 h-3.5 text-red-500" /> : <Icon name="Unlock" className="w-3.5 h-3.5 text-green-500" />}
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div className={`h-full ${app.used > app.limit * 0.8 ? 'bg-red-500' : 'bg-green-500'} rounded-full`} style={{ width: `${(app.used / app.limit) * 100}%` }} />
-                      </div>
-                      <p className="text-xs text-slate-500 font-semibold">{app.used}/{app.limit}m</p>
-                    </div>
+                    <div className="flex items-center gap-2"><p className="font-bold text-slate-900 dm-text">{app.name}</p><span className={`text-xs ${app.locked?"text-red-500":"text-green-500"}`}>{app.locked?"🔒":"🔓"}</span></div>
+                    <div className="flex items-center gap-2 mt-1"><div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden dm-surface"><div className="h-full bg-green-500 rounded-full" style={{width:"2%"}}/></div><p className="text-xs text-slate-500 dm-text-muted">{app.used}/{app.limit}m</p></div>
                   </div>
-                  <Icon name="ChevronRight" className="w-5 h-5 text-slate-300" />
+                  <span className="text-slate-300 dm-chevron">›</span>
                 </button>
               ))}
             </div>
@@ -854,280 +704,133 @@ function FitLockApp() {
           <div className="px-6 mt-6">
             <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-5 shadow-xl">
               <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-white/20 backdrop-blur rounded-xl flex items-center justify-center">
-                  <Icon name="Brain" className="w-5 h-5 text-white" />
-                </div>
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center text-xl">🧠</div>
                 <div className="flex-1">
                   <p className="text-white/80 text-xs tracking-widest font-bold mb-1">AI INSIGHT</p>
                   <p className="text-white font-bold leading-snug">You scroll Instagram most between 10-11pm. Try an evening workout instead?</p>
-                  <button className="mt-3 bg-white/20 backdrop-blur text-white text-xs font-bold px-3 py-1.5 rounded-full">Set reminder →</button>
+                  <button className="mt-3 bg-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-full">Set reminder</button>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="px-6 mt-6">
+          <div className="px-6 mt-6 mb-6">
             <div className="bg-white rounded-2xl p-5 shadow-sm">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-                  <Icon name="TreePine" className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <h3 className="font-black text-slate-900">Real-World Impact</h3>
-                  <p className="text-xs text-slate-500">Every 100 reps = 1 tree planted</p>
-                </div>
+                <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">🌳</div>
+                <div><h3 className="font-black text-slate-900">Real-World Impact</h3><p className="text-xs text-slate-500">Every 1000 pushups = 1 tree planted</p></div>
               </div>
               <div className="flex items-center justify-between bg-green-50 rounded-xl p-3">
-                <div>
-                  <p className="text-2xl font-black text-green-700">1.47</p>
-                  <p className="text-xs text-green-600 font-semibold">trees pending</p>
-                </div>
-                <div className="w-px h-10 bg-green-200" />
-                <div>
-                  <p className="text-2xl font-black text-green-700">12</p>
-                  <p className="text-xs text-green-600 font-semibold">trees planted 🌳</p>
-                </div>
+                <div><p className="text-2xl font-black text-green-700">{treesPend}</p><p className="text-xs text-green-600">trees pending</p></div>
+                <div className="w-px h-10 bg-green-200"/>
+                <div><p className="text-2xl font-black text-green-700">{trees}</p><p className="text-xs text-green-600">trees planted 🌳</p></div>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {tab === 'stats' && (
+      {tab==="stats"&&(
         <div className="pb-24">
           <div className="bg-gradient-to-br from-slate-900 to-slate-800 px-6 pt-12 pb-8 rounded-b-[2.5rem]">
-            <h1 className="text-3xl font-black text-white mb-1">Your Progress</h1>
-            <p className="text-white/60">The numbers don't lie 📊</p>
+            <h1 className="text-3xl font-black text-white">Your Progress</h1>
+            <p className="text-white/60">The numbers do not lie 📊</p>
           </div>
-
           <div className="px-6 -mt-4">
-            <div className="bg-white rounded-2xl p-5 shadow-lg mb-4">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-xs font-bold text-slate-500 tracking-wider">TIME SAVED THIS MONTH</p>
-                  <p className="text-4xl font-black text-slate-900 mt-1">42.5<span className="text-xl text-slate-400"> hrs</span></p>
-                </div>
-                <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center">
-                  <Icon name="TrendingUp" className="w-7 h-7 text-green-600" />
-                </div>
-              </div>
-              <div className="bg-green-50 rounded-xl p-3">
-                <p className="text-sm text-green-800 font-semibold">That's 5.3 extra work days reclaimed 💪</p>
+            <div className="bg-white rounded-2xl p-5 shadow-lg mb-4 dm-bg-card">
+              <div className="flex items-center justify-between">
+                <div><p className="text-xs font-bold text-slate-500 dm-text-muted tracking-wider">EARNED MINUTES</p><p className="text-4xl font-black mt-1 dm-text">{mins}<span className="text-xl text-slate-400 dm-text-muted"> min</span></p></div>
+                <div className="w-14 h-14 bg-green-100 rounded-2xl flex items-center justify-center text-2xl">📈</div>
               </div>
             </div>
-
-            <div className="bg-white rounded-2xl p-5 shadow-sm mb-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-black text-slate-900">Screen Time This Week</h3>
-                <button className="text-xs font-bold text-slate-500">Week ▾</button>
-              </div>
+            <div className="bg-white rounded-2xl p-5 shadow-sm mb-4 dm-bg-card">
+              <h3 className="font-black text-slate-900 dm-text mb-4">Screen Time This Week</h3>
               <div className="flex items-end justify-between h-40 gap-2">
-                {[4.2, 3.8, 5.1, 3.2, 2.8, 2.1, 1.9].map((hours, i) => {
-                  const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-                  const maxH = 6;
-                  const heightPct = (hours / maxH) * 100;
-                  const isToday = i === 6;
-                  return (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                      <div className="w-full flex-1 flex items-end">
-                        <div className={`w-full rounded-t-lg transition-all ${isToday ? 'bg-gradient-to-t from-orange-500 to-red-500' : 'bg-slate-200'}`} style={{ height: `${heightPct}%` }} />
-                      </div>
-                      <p className={`text-xs font-bold ${isToday ? 'text-slate-900' : 'text-slate-400'}`}>{days[i]}</p>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-500 font-semibold">AVG DAILY</p>
-                  <p className="text-lg font-black text-slate-900">3.3h</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 font-semibold">VS LAST WEEK</p>
-                  <p className="text-lg font-black text-green-600">-42%</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 font-semibold">PICKUPS</p>
-                  <p className="text-lg font-black text-slate-900">47</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl p-5 shadow-sm mb-4">
-              <h3 className="font-black text-slate-900 mb-4">Top Categories</h3>
-              <div className="space-y-3">
-                {[
-                  { name: 'Social Media', pct: 45, color: 'bg-pink-500', time: '1h 29m' },
-                  { name: 'Entertainment', pct: 28, color: 'bg-purple-500', time: '55m' },
-                  { name: 'Productivity', pct: 15, color: 'bg-green-500', time: '29m' },
-                  { name: 'Other', pct: 12, color: 'bg-slate-400', time: '23m' },
-                ].map((cat, i) => (
-                  <div key={i}>
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-3 h-3 rounded-full ${cat.color}`} />
-                        <p className="text-sm font-semibold text-slate-700">{cat.name}</p>
-                      </div>
-                      <p className="text-sm font-bold text-slate-900">{cat.time}</p>
-                    </div>
-                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                      <div className={`h-full ${cat.color} rounded-full`} style={{ width: `${cat.pct}%` }} />
-                    </div>
+                {[4.2,3.8,5.1,3.2,2.8,2.1,1.9].map((h,i)=>{const days=["M","T","W","T","F","S","S"],isT=i===6;return(
+                  <div key={i} className="flex-1 flex flex-col items-center gap-2">
+                    <div className="w-full flex-1 flex items-end"><div className={`w-full rounded-t-lg ${isT?"bg-orange-500":"bg-slate-200 dm-surface"}`} style={{height:`${(h/6)*100}%`}}/></div>
+                    <p className={`text-xs font-bold ${isT?"text-slate-900 dm-text":"text-slate-400 dm-text-muted"}`}>{days[i]}</p>
                   </div>
-                ))}
+                );})}
               </div>
             </div>
-
             <div className="bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl p-5 shadow-xl">
-              <div className="flex items-center gap-3 mb-4">
-                <Icon name="Heart" className="w-6 h-6 text-white" fill="white" />
-                <h3 className="font-black text-white">Fitness Gains</h3>
-              </div>
+              <div className="flex items-center gap-3 mb-4"><span className="text-white text-xl">❤️</span><h3 className="font-black text-white">Fitness Gains</h3></div>
               <div className="grid grid-cols-3 gap-3">
-                <div className="bg-white/15 backdrop-blur rounded-xl p-3 text-center">
-                  <p className="text-2xl font-black text-white">{totalPushups}</p>
-                  <p className="text-xs text-white/80 font-semibold">Total Reps</p>
-                </div>
-                <div className="bg-white/15 backdrop-blur rounded-xl p-3 text-center">
-                  <p className="text-2xl font-black text-white">{calculatedCalories}</p>
-                  <p className="text-xs text-white/80 font-semibold">Calories 🔥</p>
-                </div>
-                <div className="bg-white/15 backdrop-blur rounded-xl p-3 text-center">
-                  <p className="text-2xl font-black text-white">{streak}d</p>
-                  <p className="text-xs text-white/80 font-semibold">Streak</p>
-                </div>
+                <div className="bg-white/15 rounded-xl p-3 text-center"><p className="text-2xl font-black text-white">{pushups}</p><p className="text-xs text-white/80">Total Reps</p></div>
+                <div className="bg-white/15 rounded-xl p-3 text-center"><p className="text-2xl font-black text-white">{cal}</p><p className="text-xs text-white/80">Calories 🔥</p></div>
+                <div className="bg-white/15 rounded-xl p-3 text-center"><p className="text-2xl font-black text-white">{streak}d</p><p className="text-xs text-white/80">Streak</p></div>
               </div>
-              <p className="text-white/60 text-[10px] text-center mt-3">Based on ACSM guidelines: ~0.32 cal/pushup</p>
+              <p className="text-white/60 text-xs text-center mt-3">0.32 cal/pushup (ACSM guidelines)</p>
             </div>
           </div>
         </div>
       )}
 
-      {tab === 'squad' && (
+      {tab==="squad"&&(
         <div className="pb-24">
           <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 px-6 pt-12 pb-8 rounded-b-[2.5rem]">
-            <h1 className="text-3xl font-black text-white mb-1">Your Squad</h1>
+            <h1 className="text-3xl font-black text-white">Your Squad</h1>
             <p className="text-white/80">Transform together 💪</p>
           </div>
-
           <div className="px-6 -mt-4">
-            <div className="bg-white rounded-2xl p-5 shadow-lg mb-4">
+            <div className="bg-white rounded-2xl p-5 shadow-lg mb-4 dm-bg-card">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-black text-slate-900">Weekly Challenge</h3>
-                <div className="bg-orange-100 px-3 py-1 rounded-full">
-                  <p className="text-xs font-black text-orange-700">3 DAYS LEFT</p>
-                </div>
+                <h3 className="font-black text-slate-900 dm-text">Weekly Challenge</h3>
+                <div className="bg-orange-100 px-3 py-1 rounded-full"><p className="text-xs font-black text-orange-700">3 DAYS LEFT</p></div>
               </div>
               <p className="text-slate-700 font-semibold mb-3">500 Pushups Club 🏆</p>
-              <div className="h-3 bg-slate-100 rounded-full overflow-hidden mb-2">
-                <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full" style={{ width: '47%' }} />
-              </div>
-              <div className="flex justify-between text-xs font-bold">
-                <span className="text-slate-500">234 / 500</span>
-                <span className="text-purple-600">47%</span>
-              </div>
+              <div className="h-3 bg-slate-100 rounded-full overflow-hidden mb-2"><div className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full" style={{width:"47%"}}/></div>
+              <div className="flex justify-between text-xs font-bold"><span className="text-slate-500">234 / 500</span><span className="text-purple-600">47%</span></div>
             </div>
-
-            <div className="bg-white rounded-2xl p-5 shadow-sm mb-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-black text-slate-900">Leaderboard</h3>
-                <button className="text-xs font-bold text-slate-500">This week ▾</button>
-              </div>
+            <div className="bg-white rounded-2xl p-5 shadow-sm mb-4 dm-bg-card">
+              <h3 className="font-black text-slate-900 dm-text mb-4">Leaderboard</h3>
               <div className="space-y-2">
-                {squads.map((member, i) => (
-                  <div key={i} className={`flex items-center gap-3 p-3 rounded-xl ${member.isUser ? 'bg-gradient-to-r from-orange-50 to-red-50 border-2 border-orange-200' : 'bg-slate-50'}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm ${
-                      member.rank === 1 ? 'bg-yellow-400 text-yellow-900' :
-                      member.rank === 2 ? 'bg-slate-300 text-slate-700' :
-                      member.rank === 3 ? 'bg-orange-300 text-orange-900' :
-                      'bg-slate-200 text-slate-600'
-                    }`}>{member.rank}</div>
-                    <div className="w-10 h-10 bg-gradient-to-br from-slate-200 to-slate-300 rounded-full flex items-center justify-center text-xl">{member.avatar}</div>
-                    <div className="flex-1">
-                      <p className="font-bold text-slate-900">{member.name} {member.isUser && <span className="text-xs text-orange-600">(you)</span>}</p>
-                      <p className="text-xs text-slate-500">{member.pushups} pushups this week</p>
-                    </div>
-                    {member.rank <= 3 && <Icon name="Trophy" className="w-4 h-4 text-yellow-500" />}
+                {[{n:"Alex",a:"🔥",p:234,r:1},{n:"You",a:avatar,p:pushups,r:2,me:true},{n:"Jordan",a:"⚡",p:112,r:3},{n:"Sam",a:"🎯",p:89,r:4},{n:"Riley",a:"🚀",p:67,r:5}].map((m,i)=>(
+                  <div key={i} className={`flex items-center gap-3 p-3 rounded-xl ${m.me?"bg-orange-50 border-2 border-orange-200":"bg-slate-50 dm-surface"}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-sm ${m.r===1?"bg-yellow-400 text-yellow-900":m.r===2?"bg-slate-300 text-slate-700":m.r===3?"bg-orange-300 text-orange-900":"bg-slate-200 text-slate-600"}`}>{m.r}</div>
+                    <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center text-xl">{m.a}</div>
+                    <div className="flex-1"><p className="font-bold text-slate-900 dm-text">{m.n} {m.me&&<span className="text-xs text-orange-600">(you)</span>}</p><p className="text-xs text-slate-500 dm-text-muted">{m.p} pushups</p></div>
+                    {m.r<=3&&<span className="text-yellow-500">🏆</span>}
                   </div>
                 ))}
               </div>
             </div>
-
-            <button className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-transform flex items-center justify-center gap-2">
-              <Icon name="Plus" className="w-5 h-5" />
-              Invite Friends
-            </button>
+            <button onClick={share} className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2">+ Invite Friends</button>
           </div>
         </div>
       )}
 
-      {tab === 'profile' && (
+      {tab==="profile"&&(
         <div className="pb-24">
-          <div className="bg-gradient-to-br from-slate-900 to-slate-700 px-6 pt-12 pb-20 rounded-b-[2.5rem] relative">
-            <div className="flex items-center justify-between mb-6">
+          <div className="bg-gradient-to-br from-slate-900 to-slate-700 px-6 pt-12 pb-20 rounded-b-[2.5rem]">
+            <div className="flex items-center justify-between">
               <h1 className="text-2xl font-black text-white">Profile</h1>
-              <button
-                onClick={() => setShowSettings(true)}
-                className="w-10 h-10 bg-white/10 backdrop-blur rounded-full flex items-center justify-center active:scale-95 transition-transform hover:bg-white/20"
-              >
-                <Icon name="Settings" className="w-5 h-5 text-white" />
-              </button>
+              <button onClick={()=>setShowSettings(true)} className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white text-xl">⚙️</button>
             </div>
           </div>
-
           <div className="px-6 -mt-14">
-            <div className="bg-white rounded-2xl p-5 shadow-xl text-center mb-4">
-              <div className="w-20 h-20 mx-auto bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center text-4xl shadow-xl -mt-14 mb-3 border-4 border-white overflow-hidden">
-                {profileAvatarImage ? (
-                  <img src={profileAvatarImage} alt="avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <span>{profileAvatar}</span>
-                )}
-              </div>
-              <h2 className="text-xl font-black text-slate-900">{profileName}</h2>
-              <p className="text-sm text-slate-500">Level {profileLevel} · {profileXP.toLocaleString()} XP</p>
-
-              <div className="mt-4 h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-orange-500 to-red-600 rounded-full" style={{ width: '65%' }} />
-              </div>
-              <p className="text-xs text-slate-500 mt-2">{3000 - profileXP} XP to Level {profileLevel + 1} 🚀</p>
-
-              <button
-                onClick={() => {
-                  setTempName(profileName);
-                  setTempAvatar(profileAvatar);
-                  setTempAvatarImage(profileAvatarImage);
-                  setShowEditProfile(true);
-                }}
-                className="mt-4 w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
-              >
-                <Icon name="Settings" className="w-4 h-4" />
-                Edit Profile
-              </button>
+            <div className="bg-white rounded-2xl p-5 shadow-xl text-center mb-4 dm-bg-card">
+              <div className="w-20 h-20 mx-auto bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center text-4xl shadow-xl -mt-14 mb-3 border-4 border-white">{avatar}</div>
+              <h2 className="text-xl font-black text-slate-900 dm-text">{name}</h2>
+              <p className="text-sm text-slate-500 dm-text-muted">Level 1 · 0 XP</p>
+              {bio&&<p className="text-xs text-slate-400 dm-text-muted mt-1 italic">{bio}</p>}
+              {goal&&<div className="mt-2 inline-block bg-orange-100 text-orange-700 text-xs font-bold px-3 py-1 rounded-full">{goal}</div>}
+              <div className="mt-4 h-2 bg-slate-100 rounded-full overflow-hidden dm-surface"><div className="h-full bg-gradient-to-r from-orange-500 to-red-600 rounded-full" style={{width:"5%"}}/></div>
+              <button onClick={()=>{setTName(name);setTAvatar(avatar);setShowEdit(true);}} className="mt-4 w-full bg-slate-100 text-slate-700 dm-surface dm-text font-bold py-2.5 rounded-xl flex items-center justify-center gap-2">⚙️ Edit Profile</button>
             </div>
-
-            <div className="bg-white rounded-2xl p-5 shadow-sm mb-4">
-              <h3 className="font-black text-slate-900 mb-3">🏆 Achievements</h3>
-              <div className="grid grid-cols-4 gap-3">
-                {['🔥', '💪', '⚡', '🎯', '🌟', '🏅', '👑', '🔒'].map((emoji, i) => (
-                  <div key={i} className={`aspect-square rounded-xl flex items-center justify-center text-2xl ${i < 5 ? 'bg-gradient-to-br from-yellow-100 to-orange-100 shadow-sm' : 'bg-slate-100 opacity-40'}`}>{emoji}</div>
-                ))}
-              </div>
-              <p className="text-xs text-slate-500 mt-3 text-center">5 of 24 unlocked</p>
+            <div className="bg-white rounded-2xl p-5 shadow-sm mb-4 dm-bg-card">
+              <h3 className="font-black text-slate-900 dm-text mb-3">🏆 Achievements</h3>
+              <div className="grid grid-cols-4 gap-3">{["🔥","💪","⚡","🎯","🌟","🏅","👑","🔒"].map((e,i)=><div key={i} className={`aspect-square rounded-xl flex items-center justify-center text-2xl ${i<(pushups>0?1:0)?"bg-yellow-100":"bg-slate-100 dm-surface opacity-40"}`}>{e}</div>)}</div>
+              <p className="text-xs text-slate-500 dm-text-muted mt-3 text-center">Complete workouts to unlock achievements</p>
             </div>
-
-            <div className="bg-white rounded-2xl overflow-hidden shadow-sm mb-4">
-              {[
-                { iconName: 'Heart', label: 'Apple Health', value: 'Connected', color: 'text-red-500' },
-                { iconName: 'Shield', label: 'Blocking Mode', value: 'Strict', color: 'text-purple-500' },
-                { iconName: 'Bell', label: 'Notifications', value: 'On', color: 'text-blue-500' },
-                { iconName: 'Sparkles', label: 'Upgrade to Pro', value: 'Save 50%', color: 'text-orange-500', highlight: true },
-              ].map((item, i) => (
-                <button key={i} className={`w-full flex items-center gap-3 p-4 ${i !== 3 ? 'border-b border-slate-100' : ''} ${item.highlight ? 'bg-gradient-to-r from-orange-50 to-red-50' : ''}`}>
-                  <Icon name={item.iconName} className={`w-5 h-5 ${item.color}`} />
-                  <p className="flex-1 text-left font-semibold text-slate-900">{item.label}</p>
-                  <p className={`text-sm font-bold ${item.highlight ? 'text-orange-600' : 'text-slate-400'}`}>{item.value}</p>
-                  <Icon name="ChevronRight" className="w-4 h-4 text-slate-300" />
+            <div className="bg-white rounded-2xl overflow-hidden shadow-sm dm-bg-card">
+              {[{icon:"❤️",label:"Apple Health",value:cfg.health?"Connected":"Off"},{icon:"🛡️",label:"Blocking Mode",value:cfg.strict?"Strict":"Normal"},{icon:"🔔",label:"Notifications",value:cfg.notifs?"On":"Off"}].map((item,i,arr)=>(
+                <button key={i} onClick={()=>setShowSettings(true)} className={`w-full flex items-center gap-3 p-4 ${i!==arr.length-1?"border-b border-slate-100 dm-border":""}`}>
+                  <span className="text-xl">{item.icon}</span>
+                  <p className="flex-1 text-left font-semibold text-slate-900 dm-text">{item.label}</p>
+                  <p className="text-sm font-bold text-slate-400 dm-text-muted">{item.value}</p>
+                  <span className="text-slate-300 dm-chevron">›</span>
                 </button>
               ))}
             </div>
@@ -1135,458 +838,25 @@ function FitLockApp() {
         </div>
       )}
 
-      {/* EDIT PROFILE MODAL */}
-      {showEditProfile && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center animate-in" style={{maxWidth:'430px',margin:'0 auto'}}>
-          <div className="bg-white w-full rounded-t-3xl slide-up max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="sticky top-0 bg-white z-10 px-6 pt-4 pb-3 border-b border-slate-100">
-              <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto mb-4" />
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={() => setShowEditProfile(false)}
-                  className="text-slate-500 font-semibold"
-                >
-                  Cancel
-                </button>
-                <h2 className="text-lg font-black text-slate-900">Edit Profile</h2>
-                <button
-                  onClick={() => {
-                    setProfileName(tempName.trim() || 'Champion');
-                    setProfileAvatar(tempAvatar);
-                    setProfileAvatarImage(tempAvatarImage);
-                    setShowEditProfile(false);
-                  }}
-                  className="text-orange-600 font-bold"
-                >
-                  Save
-                </button>
-              </div>
-            </div>
-
-            <div className="px-6 py-6">
-              {/* Current Avatar Preview */}
-              <div className="flex flex-col items-center mb-6">
-                <div className="relative">
-                  <div className="w-28 h-28 bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center text-6xl shadow-2xl border-4 border-white overflow-hidden">
-                    {tempAvatarImage ? (
-                      <img src={tempAvatarImage} alt="preview" className="w-full h-full object-cover" />
-                    ) : (
-                      <span>{tempAvatar || '💪'}</span>
-                    )}
-                  </div>
-                  <label className="absolute bottom-0 right-0 w-9 h-9 bg-orange-500 rounded-full flex items-center justify-center border-4 border-white shadow-lg cursor-pointer">
-                    <Icon name="Camera" className="w-4 h-4 text-white" />
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          if (file.size > 5 * 1024 * 1024) {
-                            alert('Image must be under 5MB');
-                            return;
-                          }
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            setTempAvatarImage(event.target.result);
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-                <p className="text-sm text-slate-500 mt-3 font-medium">Tap camera icon to upload photo</p>
-                {tempAvatarImage && (
-                  <button
-                    onClick={() => setTempAvatarImage(null)}
-                    className="mt-2 text-xs text-red-500 font-bold"
-                  >
-                    Remove photo
-                  </button>
-                )}
-              </div>
-
-              {/* Avatar Picker */}
-              <div className="mb-6">
-                <label className="text-xs font-black text-slate-500 tracking-widest block mb-3">
-                  OR CHOOSE AN EMOJI AVATAR
-                </label>
-                <div className="grid grid-cols-6 gap-2">
-                  {['💪', '🔥', '⚡', '🎯', '🚀', '👑', '🏆', '🥊', '🏋️', '🧘', '🦁', '🐺', '🦅', '🐉', '⚔️', '🛡️', '💎', '🌟'].map((emoji) => (
-                    <button
-                      key={emoji}
-                      onClick={() => {
-                        setTempAvatar(emoji);
-                        setTempAvatarImage(null);
-                      }}
-                      className={`aspect-square rounded-xl flex items-center justify-center text-2xl transition-all active:scale-95 ${
-                        tempAvatar === emoji && !tempAvatarImage
-                          ? 'bg-gradient-to-br from-orange-500 to-red-600 shadow-lg scale-110'
-                          : 'bg-slate-100 hover:bg-slate-200'
-                      }`}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Name Input */}
-              <div className="mb-6">
-                <label className="text-xs font-black text-slate-500 tracking-widest block mb-2">DISPLAY NAME</label>
-                <input
-                  type="text"
-                  value={tempName}
-                  onChange={(e) => setTempName(e.target.value.slice(0, 20))}
-                  placeholder="Enter your name"
-                  maxLength={20}
-                  className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 font-semibold text-slate-900 focus:border-orange-500 focus:outline-none transition-colors"
-                />
-                <p className="text-xs text-slate-400 mt-1 text-right">{tempName.length}/20</p>
-              </div>
-
-              {/* Bio */}
-              <div className="mb-6">
-                <label className="text-xs font-black text-slate-500 tracking-widest block mb-2">BIO</label>
-                <textarea
-                  placeholder="I'm on a journey to reclaim my time 💪"
-                  maxLength={100}
-                  rows={3}
-                  className="w-full bg-slate-50 border-2 border-slate-200 rounded-xl px-4 py-3 text-slate-900 focus:border-orange-500 focus:outline-none transition-colors resize-none"
-                />
-              </div>
-
-              {/* Fitness Goal */}
-              <div className="mb-6">
-                <label className="text-xs font-black text-slate-500 tracking-widest block mb-2">FITNESS GOAL</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    { label: 'Build muscle', icon: '💪' },
-                    { label: 'Lose weight', icon: '⚖️' },
-                    { label: 'Break addiction', icon: '🔓' },
-                    { label: 'Stay focused', icon: '🎯' },
-                  ].map((goal) => (
-                    <button
-                      key={goal.label}
-                      className="p-3 bg-slate-50 rounded-xl flex items-center gap-2 hover:bg-slate-100 transition-colors text-left"
-                    >
-                      <span className="text-xl">{goal.icon}</span>
-                      <span className="text-sm font-semibold text-slate-700">{goal.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Danger Zone */}
-              <div className="border-t border-slate-100 pt-6">
-                <label className="text-xs font-black text-red-500 tracking-widest block mb-2">DANGER ZONE</label>
-                <button
-                  onClick={() => {
-                    if (confirm('Reset all progress? This cannot be undone.')) {
-                      setTotalPushups(0);
-                      setEarnedMinutes(0);
-                      setStreak(0);
-                      setProfileXP(0);
-                      setProfileLevel(1);
-                      setShowEditProfile(false);
-                    }
-                  }}
-                  className="w-full p-4 bg-red-50 text-red-600 font-bold rounded-xl hover:bg-red-100 transition-colors"
-                >
-                  Reset All Progress
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* SETTINGS MODAL */}
-      {showSettings && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center animate-in" style={{maxWidth:'430px',margin:'0 auto'}}>
-          <div className="bg-white w-full rounded-t-3xl slide-up max-h-[90vh] overflow-y-auto">
-            {/* Header */}
-            <div className="sticky top-0 bg-white z-10 px-6 pt-4 pb-3 border-b border-slate-100">
-              <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto mb-4" />
-              <div className="flex items-center justify-between">
-                <button
-                  onClick={() => setShowSettings(false)}
-                  className="text-slate-500 font-semibold flex items-center gap-1"
-                >
-                  <Icon name="ChevronLeft" className="w-5 h-5" />
-                  Back
-                </button>
-                <h2 className="text-lg font-black text-slate-900">Settings</h2>
-                <div className="w-16" />
-              </div>
-            </div>
-
-            <div className="px-6 py-6 space-y-6">
-              {/* App Preferences */}
-              <div>
-                <label className="text-xs font-black text-slate-500 tracking-widest block mb-3">APP PREFERENCES</label>
-                <div className="bg-slate-50 rounded-2xl overflow-hidden">
-                  {[
-                    { key: 'notifications', label: 'Push Notifications', icon: 'Bell', desc: 'Get reminders and updates' },
-                    { key: 'soundEffects', label: 'Sound Effects', icon: 'Zap', desc: 'Play sounds during workouts' },
-                    { key: 'hapticFeedback', label: 'Haptic Feedback', icon: 'Sparkles', desc: 'Vibration on interactions' },
-                    { key: 'darkMode', label: 'Dark Mode', icon: 'Shield', desc: 'Use dark theme' },
-                  ].map((item, i, arr) => (
-                    <div key={item.key} className={`flex items-center gap-3 p-4 ${i !== arr.length - 1 ? 'border-b border-slate-200' : ''}`}>
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                        <Icon name={item.icon} className="w-5 h-5 text-slate-600" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-bold text-slate-900 text-sm">{item.label}</p>
-                        <p className="text-xs text-slate-500">{item.desc}</p>
-                      </div>
-                      <button
-                        onClick={() => setSettings(s => ({...s, [item.key]: !s[item.key]}))}
-                        className={`w-12 h-7 rounded-full relative transition-colors ${settings[item.key] ? 'bg-gradient-to-r from-orange-500 to-red-600' : 'bg-slate-300'}`}
-                      >
-                        <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all ${settings[item.key] ? 'right-0.5' : 'left-0.5'}`} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Workout Settings */}
-              <div>
-                <label className="text-xs font-black text-slate-500 tracking-widest block mb-3">WORKOUT</label>
-                <div className="bg-slate-50 rounded-2xl overflow-hidden">
-                  <div className="flex items-center gap-3 p-4 border-b border-slate-200">
-                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                      <Icon name="Bell" className="w-5 h-5 text-orange-500" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-bold text-slate-900 text-sm">Exercise Reminders</p>
-                      <p className="text-xs text-slate-500">Daily workout notifications</p>
-                    </div>
-                    <button
-                      onClick={() => setSettings(s => ({...s, exerciseReminders: !s.exerciseReminders}))}
-                      className={`w-12 h-7 rounded-full relative transition-colors ${settings.exerciseReminders ? 'bg-gradient-to-r from-orange-500 to-red-600' : 'bg-slate-300'}`}
-                    >
-                      <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all ${settings.exerciseReminders ? 'right-0.5' : 'left-0.5'}`} />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-3 p-4 border-b border-slate-200">
-                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                      <Icon name="Clock" className="w-5 h-5 text-blue-500" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-bold text-slate-900 text-sm">Reminder Time</p>
-                      <p className="text-xs text-slate-500">When to send daily nudge</p>
-                    </div>
-                    <input
-                      type="time"
-                      value={settings.reminderTime}
-                      onChange={(e) => setSettings(s => ({...s, reminderTime: e.target.value}))}
-                      className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-semibold"
-                    />
-                  </div>
-
-                  <div className="p-4">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                        <Icon name="Target" className="w-5 h-5 text-green-500" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-bold text-slate-900 text-sm">Daily Pushup Goal</p>
-                        <p className="text-xs text-slate-500">{settings.dailyGoal} pushups per day</p>
-                      </div>
-                    </div>
-                    <input
-                      type="range"
-                      min="10"
-                      max="200"
-                      step="10"
-                      value={settings.dailyGoal}
-                      onChange={(e) => setSettings(s => ({...s, dailyGoal: parseInt(e.target.value)}))}
-                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-orange-500"
-                    />
-                    <div className="flex justify-between text-xs text-slate-400 mt-1 font-semibold">
-                      <span>10</span>
-                      <span className="text-orange-600 font-black">{settings.dailyGoal}</span>
-                      <span>200</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Screen Time Controls */}
-              <div>
-                <label className="text-xs font-black text-slate-500 tracking-widest block mb-3">SCREEN TIME CONTROLS</label>
-                <div className="bg-slate-50 rounded-2xl overflow-hidden">
-                  {[
-                    { key: 'strictMode', label: 'Strict Mode', icon: 'Lock', desc: "Can't unblock even if you delete the app" },
-                    { key: 'appleHealth', label: 'Apple Health Sync', icon: 'Heart', desc: 'Share workouts with Health app' },
-                  ].map((item, i, arr) => (
-                    <div key={item.key} className={`flex items-center gap-3 p-4 ${i !== arr.length - 1 ? 'border-b border-slate-200' : ''}`}>
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                        <Icon name={item.icon} className="w-5 h-5 text-slate-600" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-bold text-slate-900 text-sm">{item.label}</p>
-                        <p className="text-xs text-slate-500">{item.desc}</p>
-                      </div>
-                      <button
-                        onClick={() => setSettings(s => ({...s, [item.key]: !s[item.key]}))}
-                        className={`w-12 h-7 rounded-full relative transition-colors ${settings[item.key] ? 'bg-gradient-to-r from-orange-500 to-red-600' : 'bg-slate-300'}`}
-                      >
-                        <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all ${settings[item.key] ? 'right-0.5' : 'left-0.5'}`} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Privacy */}
-              <div>
-                <label className="text-xs font-black text-slate-500 tracking-widest block mb-3">PRIVACY & SOCIAL</label>
-                <div className="bg-slate-50 rounded-2xl overflow-hidden">
-                  {[
-                    { key: 'publicProfile', label: 'Public Profile', icon: 'User', desc: 'Show your stats to squad members' },
-                    { key: 'weeklyEmails', label: 'Weekly Progress Email', icon: 'Bell', desc: 'Get summary every Monday' },
-                  ].map((item, i, arr) => (
-                    <div key={item.key} className={`flex items-center gap-3 p-4 ${i !== arr.length - 1 ? 'border-b border-slate-200' : ''}`}>
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                        <Icon name={item.icon} className="w-5 h-5 text-slate-600" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-bold text-slate-900 text-sm">{item.label}</p>
-                        <p className="text-xs text-slate-500">{item.desc}</p>
-                      </div>
-                      <button
-                        onClick={() => setSettings(s => ({...s, [item.key]: !s[item.key]}))}
-                        className={`w-12 h-7 rounded-full relative transition-colors ${settings[item.key] ? 'bg-gradient-to-r from-orange-500 to-red-600' : 'bg-slate-300'}`}
-                      >
-                        <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all ${settings[item.key] ? 'right-0.5' : 'left-0.5'}`} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* General */}
-              <div>
-                <label className="text-xs font-black text-slate-500 tracking-widest block mb-3">GENERAL</label>
-                <div className="bg-slate-50 rounded-2xl overflow-hidden">
-                  <button className="w-full flex items-center gap-3 p-4 border-b border-slate-200 hover:bg-slate-100 transition-colors">
-                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-xl">🌍</div>
-                    <div className="flex-1 text-left">
-                      <p className="font-bold text-slate-900 text-sm">Language</p>
-                      <p className="text-xs text-slate-500">{settings.language}</p>
-                    </div>
-                    <Icon name="ChevronRight" className="w-4 h-4 text-slate-400" />
-                  </button>
-
-                  <button
-                    onClick={() => setSettings(s => ({...s, units: s.units === 'Metric' ? 'Imperial' : 'Metric'}))}
-                    className="w-full flex items-center gap-3 p-4 border-b border-slate-200 hover:bg-slate-100 transition-colors"
-                  >
-                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-xl">📏</div>
-                    <div className="flex-1 text-left">
-                      <p className="font-bold text-slate-900 text-sm">Units</p>
-                      <p className="text-xs text-slate-500">{settings.units === 'Metric' ? 'kg, cm' : 'lbs, inches'}</p>
-                    </div>
-                    <Icon name="ChevronRight" className="w-4 h-4 text-slate-400" />
-                  </button>
-
-                  <button className="w-full flex items-center gap-3 p-4 hover:bg-slate-100 transition-colors">
-                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-xl">📱</div>
-                    <div className="flex-1 text-left">
-                      <p className="font-bold text-slate-900 text-sm">App Version</p>
-                      <p className="text-xs text-slate-500">v1.0.0 (Build 100)</p>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* Support */}
-              <div>
-                <label className="text-xs font-black text-slate-500 tracking-widest block mb-3">SUPPORT</label>
-                <div className="bg-slate-50 rounded-2xl overflow-hidden">
-                  {[
-                    { icon: '❓', label: 'Help Center', desc: 'FAQs and tutorials' },
-                    { icon: '💬', label: 'Contact Us', desc: 'support@fitlock.app' },
-                    { icon: '⭐', label: 'Rate App', desc: 'Love FitLock? Tell us!' },
-                    { icon: '📄', label: 'Terms of Service', desc: 'Read our terms' },
-                    { icon: '🔒', label: 'Privacy Policy', desc: 'How we handle your data' },
-                  ].map((item, i, arr) => (
-                    <button key={item.label} className={`w-full flex items-center gap-3 p-4 ${i !== arr.length - 1 ? 'border-b border-slate-200' : ''} hover:bg-slate-100 transition-colors`}>
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm text-xl">{item.icon}</div>
-                      <div className="flex-1 text-left">
-                        <p className="font-bold text-slate-900 text-sm">{item.label}</p>
-                        <p className="text-xs text-slate-500">{item.desc}</p>
-                      </div>
-                      <Icon name="ChevronRight" className="w-4 h-4 text-slate-400" />
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Account */}
-              <div>
-                <label className="text-xs font-black text-slate-500 tracking-widest block mb-3">ACCOUNT</label>
-                <div className="bg-slate-50 rounded-2xl overflow-hidden mb-3">
-                  <button className="w-full flex items-center gap-3 p-4 hover:bg-slate-100 transition-colors">
-                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                      <Icon name="ArrowLeft" className="w-5 h-5 text-slate-600" />
-                    </div>
-                    <div className="flex-1 text-left">
-                      <p className="font-bold text-slate-900 text-sm">Log Out</p>
-                      <p className="text-xs text-slate-500">Sign out of your account</p>
-                    </div>
-                  </button>
-                </div>
-
-                <button className="w-full p-4 bg-red-50 text-red-600 font-bold rounded-2xl hover:bg-red-100 transition-colors">
-                  Delete Account
-                </button>
-                <p className="text-xs text-slate-400 text-center mt-2">This action is permanent</p>
-              </div>
-
-              {/* Made with love footer */}
-              <div className="text-center pt-4 pb-8">
-                <p className="text-xs text-slate-400">Made with 💪 by FitLock</p>
-                <p className="text-[10px] text-slate-300 mt-1">© 2026 FitLock Inc.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100" style={{maxWidth:'430px',margin:'0 auto'}}>
-        <div className="flex items-center justify-around py-2 px-2">
-          {[
-            { id: 'home', iconName: 'Home', label: 'Home' },
-            { id: 'stats', iconName: 'BarChart3', label: 'Stats' },
-            { id: 'squad', iconName: 'Users', label: 'Squad' },
-            { id: 'profile', iconName: 'User', label: 'Profile' },
-          ].map((item) => (
-            <button key={item.id} onClick={() => setTab(item.id)} className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all ${tab === item.id ? 'text-orange-600' : 'text-slate-400'}`}>
-              <Icon name={item.iconName} className="w-5 h-5" strokeWidth={tab === item.id ? 2.5 : 2} />
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 dm-tab-bar dm-border">
+        <div className="flex items-center justify-around py-2 px-2 max-w-md mx-auto">
+          {[{id:"home",icon:"🏠",label:"Home"},{id:"stats",icon:"📊",label:"Stats"},{id:"squad",icon:"👥",label:"Squad"},{id:"profile",icon:"👤",label:"Profile"}].map(item=>(
+            <button key={item.id} onClick={()=>setTab(item.id)} className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all ${tab===item.id?"text-orange-600":"text-slate-400 dm-tab-inactive"}`}>
+              <span className={`text-xl ${tab===item.id?"opacity-100":"opacity-60"}`}>{item.icon}</span>
               <p className="text-[10px] font-bold tracking-wide">{item.label}</p>
             </button>
           ))}
         </div>
       </div>
 
-      {tab === 'home' && (
-        <button onClick={() => setExerciseMode(exercises[0])} className="fixed bottom-20 right-4 w-14 h-14 bg-gradient-to-br from-orange-500 to-red-600 rounded-full shadow-2xl flex items-center justify-center active:scale-95 transition-transform z-40" style={{right:'calc(50% - 211px)'}}>
-          <Icon name="Zap" className="w-6 h-6 text-white" fill="white" />
-        </button>
+      {tab==="home"&&(
+        <button onClick={()=>setEx(EXERCISES[0])} className="fixed bottom-20 right-4 w-14 h-14 bg-gradient-to-br from-orange-500 to-red-600 rounded-full shadow-2xl flex items-center justify-center z-40 text-2xl">⚡</button>
       )}
     </div>
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<FitLockApp />);
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
 </html>
